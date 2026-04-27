@@ -1,37 +1,91 @@
-const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
+// index.js
 
+const {
+    Client,
+    GatewayIntentBits,
+    EmbedBuilder,
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle,
+    ModalBuilder,
+    TextInputBuilder,
+    TextInputStyle,
+    SlashCommandBuilder,
+    REST,
+    Routes
+} = require("discord.js");
+require("dotenv").config();
+
+// =====================
+// CLIENT
+// =====================
 const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
-  ]
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent
+    ]
 });
 
-client.on('ready', () => {
-  console.log(`Bot běží jako ${client.user.tag}`);
-});
+// Uložené editory: podle uživatele
+const editors = new Map();
 
-client.on('messageCreate', (message) => {
-  if (message.author.bot) return;
+// =====================
+// REGISTRACE SLASH CMD
+// =====================
+const commands = [
+    new SlashCommandBuilder()
+        .setName("embed")
+        .setDescription("Vytvoří kompletní embed podle zadaných parametrů")
+        .addStringOption(opt =>
+            opt.setName("title")
+                .setDescription("Název embedu")
+                .setRequired(true)
+        )
+        .addStringOption(opt =>
+            opt.setName("description")
+                .setDescription("Popis embedu")
+                .setRequired(true)
+        )
+        .addStringOption(opt =>
+            opt.setName("color")
+                .setDescription("Barva embedu (hex nebo název)")
+                .setRequired(false)
+        )
+        .addStringOption(opt =>
+            opt.setName("thumbnail")
+                .setDescription("URL náhledu (thumbnail)")
+                .setRequired(false)
+        )
+        .addStringOption(opt =>
+            opt.setName("image")
+                .setDescription("URL obrázku")
+                .setRequired(false)
+        )
+        .addStringOption(opt =>
+            opt.setName("footer")
+                .setDescription("Text ve footeru")
+                .setRequired(false)
+        )
+        .addStringOption(opt =>
+            opt.setName("field_name")
+                .setDescription("Název pole (field)")
+                .setRequired(false)
+        )
+        .addStringOption(opt =>
+            opt.setName("field_value")
+                .setDescription("Hodnota pole (field)")
+                .setRequired(false)
+        ),
 
-  if (message.content.startsWith('!embed')) {
-    const args = message.content.slice(6).trim().split('|');
+    new SlashCommandBuilder()
+        .setName("embed-editor")
+        .setDescription("Otevře editor existujícího embedu")
+        .addStringOption(opt =>
+            opt.setName("message_id")
+                .setDescription("ID zprávy s embedem v tomto kanálu")
+                .setRequired(true)
+        )
+].map(c => c.toJSON());
 
-    const title = (args[0] || 'Bez názvu').trim();
-    const description = (args[1] || 'Bez popisu').trim();
-    const color = (args[2] || '00ff99').trim().replace('#', '');
-    const footer = (args[3] || 'Embed bot').trim();
-
-    const embed = new EmbedBuilder()
-      .setTitle(title)
-      .setDescription(description)
-      .setColor(parseInt(color, 16))
-      .setFooter({ text: footer })
-      .setTimestamp();
-
-    message.channel.send({ embeds: [embed] });
-  }
-});
-
-client.login(process.env.TOKEN);
+const rest = new
