@@ -128,8 +128,8 @@ client.on("interactionCreate", async interaction => {
                     "• **/embed** — Vytvoříte si embed\n" +
                     "• **/embed-editor** — Upravíte stávající embed"
                 )
-                .setFooter("Made by monsignorholly")
-                .setTimestamp()
+                .setFooter({ text: "Made by monsignorholly"})
+                .setTimestamp();
             return interaction.reply({embeds: [helpEmbed], ephemeral: true});
         }
             
