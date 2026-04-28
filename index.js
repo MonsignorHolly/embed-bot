@@ -138,30 +138,21 @@ client.on("interactionCreate", async interaction => {
         }
         
         if (interaction.commandName === 'vtip') {
-            try {
-                const res = await fetch("https://www.alik.cz/vtipy");
-                const html = await res.text();
+    try {
+        const res = await fetch("https://v2.jokeapi.dev/joke/Any?lang=cs");
+        const data = await res.json();
 
-                // Najdeme první vtip na stránce (jednoduchý regex)
-                const match = html.match(/<p>(.*?)<\/p>/);
+        let vtip = data.type === "single"
+            ? data.joke
+            : `${data.setup}\n\n${data.delivery}`;
 
-                let vtip = match ? match[1] : "Nepodařilo se načíst vtip.";
+        return interaction.reply(`😂 **Náhodný vtip:**\n\n${vtip}`);
+    } catch (err) {
+        console.error(err);
+        return interaction.reply("⚠️ Nepodařilo se načíst vtip.");
+    }
+}
 
-                // Odstraníme HTML entity
-                vtip = vtip.replace(/&quot;/g, '"').replace(/&amp;/g, '&');
-
-                return interaction.reply({
-                    content: `😂 **Náhodný vtip z Alík.cz:**\n\n${vtip}`
-                });
-
-            } catch (err) {
-                console.error(err);
-                return interaction.reply({
-                    content: "⚠️ Nepodařilo se načíst vtip z Alík.cz.",
-                    ephemeral: false
-                });
-            }
-        }
         // /embed
         if (commandName === "embed") {
             const title = interaction.options.getString("title");
