@@ -118,7 +118,6 @@ client.once("ready", async () => {
 // =====================
 // INTERACTION HANDLER
 // =====================
-const fetch = require('node-fetch');
 client.on("interactionCreate", async interaction => {
     // -----------------
     // SLASH COMMANDS
