@@ -86,6 +86,10 @@ const commands = [
                 .setDescription("ID zprávy s embedem v tomto kanálu")
                 .setRequired(true)
         )
+    new SlashCommandBuilder()
+        .setName("help")
+        .setDescription("Nevíš si rady? Využij tento command!")
+        
 ].map(c => c.toJSON());
 
 const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
@@ -116,7 +120,19 @@ client.on("interactionCreate", async interaction => {
     // -----------------
     if (interaction.isChatInputCommand()) {
         const { commandName } = interaction;
-
+        if (commandName === "help") {
+            const helpEmbed = new EmbedBuilder()
+                .setTitle("🔗 Příkazy Bota 🔗")
+                .setColor("#ffc414")
+                 .setDescription("
+                        ***/embed*** - *Vytvoříš si vlastní embed, podle svého gusta v jednom řádku!*
+                        ***/embed-editor*** - *Upravíš stávající Embed, potřebuješ pouze message ID.*
+                    ")
+                 .setFooter("Made by monsignorholly")
+                .setTimestamp()
+            return interaction.reply({embeds: [embed], ephemeral: true});
+        }
+            
         // /embed
         if (commandName === "embed") {
             const title = interaction.options.getString("title");
