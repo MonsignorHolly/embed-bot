@@ -124,10 +124,10 @@ client.on("interactionCreate", async interaction => {
             const helpEmbed = new EmbedBuilder()
                 .setTitle("🔗 Příkazy Bota 🔗")
                 .setColor("#ffc414")
-                .setDescription("
-                        ***/embed*** - *Vytvoříš si vlastní embed, podle svého gusta v jednom řádku!*
-                         ***/embed-editor*** - *Upravíš stávající Embed, potřebuješ pouze message ID.*
-                        ")
+                .setDescription(
+                    "***/embed*** - *Vytvoříš si vlastní embed, podle svého gusta v jednom řádku!*"
+                    "***/embed-editor*** - *Upravíš stávající Embed, potřebuješ pouze message ID.*"
+                )
                 .setFooter("Made by monsignorholly")
                 .setTimestamp()
             return interaction.reply({embeds: [embed], ephemeral: true});
