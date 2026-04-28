@@ -88,7 +88,11 @@ const commands = [
         ),
     new SlashCommandBuilder()
         .setName("help")
-        .setDescription("Nevíš si rady? Využij tento command!")
+        .setDescription("Nevíš si rady? Využij tento command!"),
+    
+    new SlashCommandBuilder()
+        .setName("vtip")
+        .setDescription("Tento příkaz ti zašle vtip z Webu Alik.cz")
         
 ].map(c => c.toJSON());
 
@@ -132,7 +136,32 @@ client.on("interactionCreate", async interaction => {
                 .setTimestamp();
             return interaction.reply({embeds: [helpEmbed], ephemeral: true});
         }
-            
+        const fetch = require('node-fetch');
+        if (interaction.commandName === 'vtip') {
+            try {
+                const res = await fetch("https://www.alik.cz/vtipy");
+                const html = await res.text();
+
+                // Najdeme první vtip na stránce (jednoduchý regex)
+                const match = html.match(/<p>(.*?)<\/p>/);
+
+                let vtip = match ? match[1] : "Nepodařilo se načíst vtip.";
+
+                // Odstraníme HTML entity
+                vtip = vtip.replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+
+                return interaction.reply({
+                    content: `😂 **Náhodný vtip z Alík.cz:**\n\n${vtip}`
+                });
+
+            } catch (err) {
+                console.error(err);
+                return interaction.reply({
+                    content: "⚠️ Nepodařilo se načíst vtip z Alík.cz.",
+                    ephemeral: false
+                });
+            }
+        }
         // /embed
         if (commandName === "embed") {
             const title = interaction.options.getString("title");
