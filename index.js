@@ -137,21 +137,44 @@ client.on("interactionCreate", async interaction => {
             return interaction.reply({embeds: [helpEmbed], ephemeral: true});
         }
         
+        let posledniVtip = null;
+
         if (interaction.commandName === 'vtip') {
-    try {
-        const res = await fetch("https://v2.jokeapi.dev/joke/Any?lang=cs");
-        const data = await res.json();
+            try {
+                const res = await fetch("https://v2.jokeapi.dev/joke/Any?lang=cs");
+                const data = await res.json();
+        
+                let vtip = data.type === "single"
+                    ? data.joke
+                    : `${data.setup}\n\n${data.delivery}`;
+        
+                // Pokud je stejný jako poslední → načti nový
+                if (vtip === posledniVtip) {
+                    const res2 = await fetch("https://v2.jokeapi.dev/joke/Any?lang=cs");
+                    const data2 = await res2.json();
+        
+                    vtip = data2.type === "single"
+                        ? data2.joke
+                        : `${data2.setup}\n\n${data2.delivery}`;
+                }
+        
+                // Uložíme poslední vtip
+                posledniVtip = vtip;
+        
+                return interaction.reply({
+                    content: `😂 **Náhodný vtip:**\n\n${vtip}`,
+                    ephemeral: true // jen pro tebe
+                });
+        
+            } catch (err) {
+                console.error(err);
+                return interaction.reply({
+                    content: "⚠️ Nepodařilo se načíst vtip.",
+                    ephemeral: true
+                });
+            }
+        }
 
-        let vtip = data.type === "single"
-            ? data.joke
-            : `${data.setup}\n\n${data.delivery}`;
-
-        return interaction.reply(`😂 **Náhodný vtip:**\n\n${vtip}`);
-    } catch (err) {
-        console.error(err);
-        return interaction.reply("⚠️ Nepodařilo se načíst vtip.");
-    }
-}
 
         // /embed
         if (commandName === "embed") {
