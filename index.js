@@ -85,7 +85,7 @@ const commands = [
             opt.setName("message_id")
                 .setDescription("ID zprávy s embedem v tomto kanálu")
                 .setRequired(true)
-        )
+        ),
     new SlashCommandBuilder()
         .setName("help")
         .setDescription("Nevíš si rady? Využij tento command!")
