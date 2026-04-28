@@ -137,33 +137,45 @@ client.on("interactionCreate", async interaction => {
             return interaction.reply({embeds: [helpEmbed], ephemeral: true});
         }
         
-        let posledniVtip = null;
+        let posledniVtipy = []; // uložíme posledních 5 vtipů
 
         if (interaction.commandName === 'vtip') {
             try {
-                const res = await fetch("https://v2.jokeapi.dev/joke/Any?lang=cs");
-                const data = await res.json();
+                let vtip = null;
+                let pokusy = 0;
         
-                let vtip = data.type === "single"
-                    ? data.joke
-                    : `${data.setup}\n\n${data.delivery}`;
+                while (!vtip && pokusy < 5) {
+                    const res = await fetch("https://v2.jokeapi.dev/joke/Any?lang=cs");
+                    const data = await res.json();
         
-                // Pokud je stejný jako poslední → načti nový
-                if (vtip === posledniVtip) {
-                    const res2 = await fetch("https://v2.jokeapi.dev/joke/Any?lang=cs");
-                    const data2 = await res2.json();
+                    let novy = data.type === "single"
+                        ? data.joke
+                        : `${data.setup}\n\n${data.delivery}`;
         
-                    vtip = data2.type === "single"
-                        ? data2.joke
-                        : `${data2.setup}\n\n${data2.delivery}`;
+                    // pokud už jsme ho poslali, zkusíme další
+                    if (!posledniVtipy.includes(novy)) {
+                        vtip = novy;
+                    }
+        
+                    pokusy++;
                 }
         
-                // Uložíme poslední vtip
-                posledniVtip = vtip;
+                // když API vrací pořád to samé → vezmeme to i tak
+                if (!vtip) {
+                    vtip = "API vrací pořád stejný vtip, zkus to za chvíli 😅";
+                }
+        
+                // uložíme vtip do historie
+                posledniVtipy.push(vtip);
+        
+                // držíme jen posledních 5
+                if (posledniVtipy.length > 5) {
+                    posledniVtipy.shift();
+                }
         
                 return interaction.reply({
                     content: `😂 **Náhodný vtip:**\n\n${vtip}`,
-                    ephemeral: true // jen pro tebe
+                    ephemeral: true
                 });
         
             } catch (err) {
@@ -174,6 +186,7 @@ client.on("interactionCreate", async interaction => {
                 });
             }
         }
+
 
 
         // /embed
