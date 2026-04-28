@@ -130,7 +130,7 @@ client.on("interactionCreate", async interaction => {
                 )
                 .setFooter("Made by monsignorholly")
                 .setTimestamp()
-            return interaction.reply({embeds: [embed], ephemeral: true});
+            return interaction.reply({embeds: [helpEmbed], ephemeral: true});
         }
             
         // /embed
