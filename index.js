@@ -125,8 +125,8 @@ client.on("interactionCreate", async interaction => {
                 .setTitle("🔗 Příkazy Bota 🔗")
                 .setColor("#ffc414")
                 .setDescription(
-                    "***/embed*** - *Vytvoříš si vlastní embed, podle svého gusta v jednom řádku!*"
-                    "***/embed-editor*** - *Upravíš stávající Embed, potřebuješ pouze message ID.*"
+                    `• **/embed** — Vytvoříte si embed\n` +
+                    `• **/embed-editor** — Upravíte stávající embed`
                 )
                 .setFooter("Made by monsignorholly")
                 .setTimestamp()
