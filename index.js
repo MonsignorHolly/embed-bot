@@ -137,41 +137,34 @@ client.on("interactionCreate", async interaction => {
             return interaction.reply({embeds: [helpEmbed], ephemeral: true});
         }
         
-        let posledniVtipy = []; // uložíme posledních 5 vtipů
+        let posledniVtipy = [];
 
         if (interaction.commandName === 'vtip') {
             try {
+                const res = await fetch("https://raw.githubusercontent.com/pehapkari/pehapkari.cz/master/source/_data/jokes.json");
+                const data = await res.json();
+        
+                // náhodný vtip
                 let vtip = null;
                 let pokusy = 0;
         
-                while (!vtip && pokusy < 5) {
-                    const res = await fetch("https://v2.jokeapi.dev/joke/Any?lang=cs");
-                    const data = await res.json();
+                while (!vtip && pokusy < 10) {
+                    const nahodny = data[Math.floor(Math.random() * data.length)].joke;
         
-                    let novy = data.type === "single"
-                        ? data.joke
-                        : `${data.setup}\n\n${data.delivery}`;
-        
-                    // pokud už jsme ho poslali, zkusíme další
-                    if (!posledniVtipy.includes(novy)) {
-                        vtip = novy;
+                    if (!posledniVtipy.includes(nahodny)) {
+                        vtip = nahodny;
                     }
         
                     pokusy++;
                 }
         
-                // když API vrací pořád to samé → vezmeme to i tak
                 if (!vtip) {
-                    vtip = "API vrací pořád stejný vtip, zkus to za chvíli 😅";
+                    vtip = "Dneska už jsem vyčerpal všechny vtipy 😅";
                 }
         
-                // uložíme vtip do historie
+                // uložíme do historie
                 posledniVtipy.push(vtip);
-        
-                // držíme jen posledních 5
-                if (posledniVtipy.length > 5) {
-                    posledniVtipy.shift();
-                }
+                if (posledniVtipy.length > 10) posledniVtipy.shift();
         
                 return interaction.reply({
                     content: `😂 **Náhodný vtip:**\n\n${vtip}`,
@@ -186,9 +179,7 @@ client.on("interactionCreate", async interaction => {
                 });
             }
         }
-
-
-
+        
         // /embed
         if (commandName === "embed") {
             const title = interaction.options.getString("title");
