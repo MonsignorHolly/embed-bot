@@ -118,6 +118,7 @@ client.once("ready", async () => {
 // =====================
 // INTERACTION HANDLER
 // =====================
+const fetch = require('node-fetch');
 client.on("interactionCreate", async interaction => {
     // -----------------
     // SLASH COMMANDS
@@ -136,7 +137,7 @@ client.on("interactionCreate", async interaction => {
                 .setTimestamp();
             return interaction.reply({embeds: [helpEmbed], ephemeral: true});
         }
-        const fetch = require('node-fetch');
+        
         if (interaction.commandName === 'vtip') {
             try {
                 const res = await fetch("https://www.alik.cz/vtipy");
