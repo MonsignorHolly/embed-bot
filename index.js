@@ -120,7 +120,7 @@ client.on("interactionCreate", async interaction => {
     // -----------------
     if (interaction.isChatInputCommand()) {
         const { commandName } = interaction;
-        if (commandName === "help") {
+        if (interaction.commandName === "help") {
             const helpEmbed = new EmbedBuilder()
                 .setTitle("🔗 Příkazy Bota 🔗")
                 .setColor("#ffc414")
