@@ -126,8 +126,8 @@ client.on("interactionCreate", async interaction => {
                 .setColor("#ffc414")
                 .setDescription("
                         ***/embed*** - *Vytvoříš si vlastní embed, podle svého gusta v jednom řádku!*
-                        ***/embed-editor*** - *Upravíš stávající Embed, potřebuješ pouze message ID.*
-                ")
+                         ***/embed-editor*** - *Upravíš stávající Embed, potřebuješ pouze message ID.*
+                        ")
                 .setFooter("Made by monsignorholly")
                 .setTimestamp()
             return interaction.reply({embeds: [embed], ephemeral: true});
