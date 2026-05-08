@@ -108,7 +108,6 @@ client.on("interactionCreate", async interaction => {
 
     if (interaction.isChatInputCommand()) {
 
-        // HELP
         if (interaction.commandName === "help") {
             return interaction.reply({
                 embeds: [
@@ -125,7 +124,6 @@ client.on("interactionCreate", async interaction => {
             });
         }
 
-        // TICKET PANEL
         if (interaction.commandName === "ticket-panel") {
 
             const menu = new StringSelectMenuBuilder()
@@ -144,15 +142,14 @@ client.on("interactionCreate", async interaction => {
                 embeds: [
                     new EmbedBuilder()
                         .setTitle("🎫 Ticket Systém")
-                        .setDescription("🛩️ Ticket systém, nejdůležitější část našeho Discordu.\nDíky níž Vám můžeme být oporou i mimo hru. 💙")
+                        .setDescription("🛩️ Ticket systém, nejdůležitější část našeho Discordu.")
                         .setColor(EMBED_COLOR)
-                        .setFooter({text: "(c) 2026 LexionRP.cz - all rights reserved."})
+                        .setFooter({ text: "(c) 2026 LexionRP.cz - all rights reserved." })
                 ],
                 components: [new ActionRowBuilder().addComponents(menu)]
             });
         }
 
-        // EMBED CREATOR
         if (interaction.commandName === "embed") {
 
             const modal = new ModalBuilder()
@@ -182,7 +179,6 @@ client.on("interactionCreate", async interaction => {
             return interaction.showModal(modal);
         }
 
-        // EMBED EDITOR
         if (interaction.commandName === "embed-editor") {
 
             const id = interaction.options.getString("message_id");
@@ -287,12 +283,13 @@ client.on("interactionCreate", async interaction => {
                 .setStyle(ButtonStyle.Danger);
 
             await channel.send({
-                content: "Zdravím <@${interaction.user.id}>",
+                // ❌ FIX: špatný string
+                content: `Zdravím <@${interaction.user.id}>`,
                 embeds: [
                     new EmbedBuilder()
                         .setTitle("🎫 Ticket")
                         .setColor(EMBED_COLOR)
-                        .setDescription("Prosíme, aby jsi mezitím, než se ti ozve člen podpory, sepsal/a pečlivě tvůj problém.")
+                        .setDescription("Prosíme, popiš problém.")
                 ],
                 components: [new ActionRowBuilder().addComponents(close)]
             });
@@ -310,13 +307,15 @@ client.on("interactionCreate", async interaction => {
 
     if (interaction.isButton()) {
 
-        // CLOSE TICKET SAFE
+        // ======================
+        // CLOSE TICKET (FIX pořadí + safe return)
+        // ======================
+
         if (interaction.customId === "close_ticket") {
 
             await interaction.deferReply({ ephemeral: true }).catch(() => {});
 
             try {
-
                 const messages = await interaction.channel.messages.fetch({ limit: 100 });
 
                 const transcript = messages
@@ -327,7 +326,6 @@ client.on("interactionCreate", async interaction => {
                     .join("\n");
 
                 const fileName = `transcript-${interaction.channel.id}.txt`;
-
                 fs.writeFileSync(fileName, transcript);
 
                 const file = new AttachmentBuilder(fileName);
@@ -357,10 +355,16 @@ client.on("interactionCreate", async interaction => {
                     content: "❌ Chyba při zavírání ticketu"
                 });
             }
+
+            return;
         }
 
-        // EMBED EDITOR
+        // ======================
+        // EMBED EDITOR SAFE FIX
+        // ======================
+
         const editor = editors.get(interaction.user.id);
+
         if (!editor) return;
 
         const { embed, messageId } = editor;
@@ -384,12 +388,8 @@ client.on("interactionCreate", async interaction => {
 
         const input = new TextInputBuilder()
             .setCustomId("value")
-            .setStyle(TextInputStyle.Short)
-            .setLabel("Value");
-
-        if (interaction.customId === "edit_desc") {
-            input.setStyle(TextInputStyle.Paragraph);
-        }
+            .setLabel("Value")
+            .setStyle(interaction.customId === "edit_desc" ? TextInputStyle.Paragraph : TextInputStyle.Short);
 
         modal.addComponents(new ActionRowBuilder().addComponents(input));
 
@@ -403,16 +403,8 @@ client.on("interactionCreate", async interaction => {
     if (interaction.isModalSubmit()) {
 
         const editor = editors.get(interaction.user.id);
-        if (!editor) return;
 
-        const value = interaction.fields.getTextInputValue("value");
-
-        if (interaction.customId === "edit_title") editor.embed.setTitle(value);
-        if (interaction.customId === "edit_desc") editor.embed.setDescription(value);
-        if (interaction.customId === "edit_color") editor.embed.setColor(value);
-        if (interaction.customId === "edit_thumb") editor.embed.setThumbnail(value);
-        if (interaction.customId === "edit_image") editor.embed.setImage(value);
-
+        // FIX: embed_create NESMÍ záviset na editoru
         if (interaction.customId === "embed_create") {
 
             const embed = new EmbedBuilder()
@@ -428,6 +420,16 @@ client.on("interactionCreate", async interaction => {
 
             return interaction.reply({ embeds: [embed] });
         }
+
+        if (!editor) return;
+
+        const value = interaction.fields.getTextInputValue("value");
+
+        if (interaction.customId === "edit_title") editor.embed.setTitle(value);
+        if (interaction.customId === "edit_desc") editor.embed.setDescription(value);
+        if (interaction.customId === "edit_color") editor.embed.setColor(value);
+        if (interaction.customId === "edit_thumb") editor.embed.setThumbnail(value);
+        if (interaction.customId === "edit_image") editor.embed.setImage(value);
 
         return interaction.reply({
             content: "✔ Upraveno",
