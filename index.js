@@ -305,38 +305,61 @@ client.on("interactionCreate", async interaction => {
 
         // CLOSE TICKET
         if (interaction.customId === "close_ticket") {
-
-            const messages = await interaction.channel.messages.fetch({ limit: 100 });
-
-            const transcript = messages
-                .map(m =>
-                    `[${new Date(m.createdTimestamp).toLocaleString()}] ${m.author.tag}: ${m.content}`
-                )
-                .reverse()
-                .join("\n");
-
-            const fileName = `transcript-${interaction.channel.id}.txt`;
-
-            fs.writeFileSync(fileName, transcript);
-
-            const file = new AttachmentBuilder(fileName);
-
-            const logChannel =
-                interaction.guild.channels.cache.get(TRANSCRIPT_CHANNEL_ID);
-
-            if (logChannel) {
-                await logChannel.send({
-                    content: "📄 Ticket transcript",
-                    files: [file]
+        
+            await interaction.deferReply({ ephemeral: true }).catch(() => {});
+        
+            try {
+        
+                const messages = await interaction.channel.messages.fetch({ limit: 100 });
+        
+                const transcript = messages
+                    .map(m =>
+                        `[${new Date(m.createdTimestamp).toLocaleString()}] ${m.author.tag}: ${m.content || "[embed/attachment]"}`
+                    )
+                    .reverse()
+                    .join("\n");
+        
+                const fileName = `transcript-${interaction.channel.id}.txt`;
+        
+                fs.writeFileSync(fileName, transcript);
+        
+                const file = new AttachmentBuilder(fileName);
+        
+                const logChannel =
+                    interaction.guild.channels.cache.get(TRANSCRIPT_CHANNEL_ID);
+        
+                if (logChannel) {
+                    await logChannel.send({
+                        content: "📄 Ticket transcript",
+                        files: [file]
+                    }).catch(() => {});
+                }
+        
+                await interaction.editReply({
+                    content: "🔒 Ticket se zavírá..."
+                });
+        
+                setTimeout(async () => {
+        
+                    await interaction.channel.delete().catch(() => {});
+        
+                    try {
+                        if (fs.existsSync(fileName)) {
+                            fs.unlinkSync(fileName);
+                        }
+                    } catch (err) {
+                        console.error("File delete error:", err);
+                    }
+        
+                }, 3000);
+        
+            } catch (err) {
+                console.error("❌ Close ticket error:", err);
+        
+                return interaction.editReply({
+                    content: "❌ Nepodařilo se zavřít ticket."
                 });
             }
-
-            await interaction.reply({ content: "🔒 Zavírám ticket..." });
-
-            setTimeout(() => {
-                interaction.channel.delete().catch(() => {});
-                fs.unlinkSync(fileName);
-            }, 3000);
         }
 
         // ======================
