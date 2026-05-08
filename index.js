@@ -28,6 +28,15 @@ require("dotenv").config();
 const SUPPORT_ROLE_ID = "1484591886940377219";
 const TRANSCRIPT_CHANNEL_ID = "1502368876892127342";
 
+const TICKET_CATEGORIES = {
+    frakce: "1485272944270901420",
+    ck: "1502366579625820340",
+    shop: "1502366748517601451",
+    pomoc: "1485272897453953035",
+    report: "1502366625238876201",
+    partner: "1502366896811675658"
+};
+
 // ======================
 // CLIENT
 // ======================
@@ -40,10 +49,7 @@ const client = new Client({
     ]
 });
 
-// ======================
-// EMBED EDITORS
-// ======================
-
+// embed editor storage
 const editors = new Map();
 
 // ======================
@@ -51,7 +57,6 @@ const editors = new Map();
 // ======================
 
 const commands = [
-
     new SlashCommandBuilder()
         .setName("ticket-panel")
         .setDescription("Otevře ticket menu"),
@@ -71,13 +76,8 @@ const commands = [
 
     new SlashCommandBuilder()
         .setName("help")
-        .setDescription("Zobrazí všechny příkazy")
-
+        .setDescription("Přehled příkazů")
 ].map(c => c.toJSON());
-
-// ======================
-// REGISTER
-// ======================
 
 const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
 
@@ -106,37 +106,25 @@ client.on("interactionCreate", async interaction => {
 
     if (interaction.isChatInputCommand()) {
 
-        // ======================
         // HELP
-        // ======================
-
         if (interaction.commandName === "help") {
 
-            const embed = new EmbedBuilder()
-                .setTitle("📘 Help menu")
-                .setColor("#ffc414")
-                .setDescription(
-                    "**🎫 TICKETY**\n" +
-                    "/ticket-panel - otevře ticket menu\n\n" +
-
-                    "**🧾 EMBED SYSTEM**\n" +
-                    "/embed - vytvoření embedu\n" +
-                    "/embed-editor - úprava embedu\n\n" +
-
-                    "**ℹ️ OSTATNÍ**\n" +
-                    "/help - seznam příkazů"
-                );
-
             return interaction.reply({
-                embeds: [embed],
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("📘 Help")
+                        .setColor("#ffc414")
+                        .setDescription(
+                            "**🎫 Ticket**\n/ticket-panel\n\n" +
+                            "**🧾 Embed**\n/embed\n/embed-editor\n\n" +
+                            "**ℹ️ Info**\n/help"
+                        )
+                ],
                 ephemeral: true
             });
         }
 
-        // ======================
         // TICKET PANEL
-        // ======================
-
         if (interaction.commandName === "ticket-panel") {
 
             const menu = new StringSelectMenuBuilder()
@@ -151,72 +139,47 @@ client.on("interactionCreate", async interaction => {
                     { label: "Shop", value: "shop", emoji: "🛒" }
                 ]);
 
-            const embed = new EmbedBuilder()
-                .setTitle("🎫 Ticket System")
-                .setDescription("Vyber kategorii ticketu")
-                .setColor("#ffc414");
-
             return interaction.reply({
-                embeds: [embed],
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("🎫 Ticket System")
+                        .setColor("#ffc414")
+                ],
                 components: [new ActionRowBuilder().addComponents(menu)]
             });
         }
 
-        // ======================
         // EMBED CREATOR
-        // ======================
-
         if (interaction.commandName === "embed") {
 
             const modal = new ModalBuilder()
                 .setCustomId("embed_create")
                 .setTitle("Vytvořit Embed");
 
-            const title = new TextInputBuilder()
-                .setCustomId("title")
-                .setLabel("Název")
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true);
-
-            const desc = new TextInputBuilder()
-                .setCustomId("desc")
-                .setLabel("Popis")
-                .setStyle(TextInputStyle.Paragraph)
-                .setRequired(true);
-
-            const color = new TextInputBuilder()
-                .setCustomId("color")
-                .setLabel("Barva (#ff0000)")
-                .setStyle(TextInputStyle.Short)
-                .setRequired(false);
-
-            const thumb = new TextInputBuilder()
-                .setCustomId("thumb")
-                .setLabel("Thumbnail URL")
-                .setStyle(TextInputStyle.Short)
-                .setRequired(false);
-
-            const image = new TextInputBuilder()
-                .setCustomId("image")
-                .setLabel("Image URL")
-                .setStyle(TextInputStyle.Short)
-                .setRequired(false);
+            const fields = [
+                ["title", "Title", TextInputStyle.Short],
+                ["desc", "Description", TextInputStyle.Paragraph],
+                ["color", "Color (#ff0000)", TextInputStyle.Short],
+                ["thumb", "Thumbnail URL", TextInputStyle.Short],
+                ["image", "Image URL", TextInputStyle.Short]
+            ];
 
             modal.addComponents(
-                new ActionRowBuilder().addComponents(title),
-                new ActionRowBuilder().addComponents(desc),
-                new ActionRowBuilder().addComponents(color),
-                new ActionRowBuilder().addComponents(thumb),
-                new ActionRowBuilder().addComponents(image)
+                ...fields.map(f =>
+                    new ActionRowBuilder().addComponents(
+                        new TextInputBuilder()
+                            .setCustomId(f[0])
+                            .setLabel(f[1])
+                            .setStyle(f[2])
+                            .setRequired(false)
+                    )
+                )
             );
 
             return interaction.showModal(modal);
         }
 
-        // ======================
         // EMBED EDITOR
-        // ======================
-
         if (interaction.commandName === "embed-editor") {
 
             const id = interaction.options.getString("message_id");
@@ -261,6 +224,11 @@ client.on("interactionCreate", async interaction => {
         if (interaction.customId === "ticket_select") {
 
             const category = interaction.values[0];
+            const categoryId = TICKET_CATEGORIES[category];
+
+            if (!categoryId) {
+                return interaction.reply({ content: "❌ Neplatná kategorie", ephemeral: true });
+            }
 
             const existing = interaction.guild.channels.cache.find(c =>
                 c.name.startsWith(`ticket-${category}-${interaction.user.id}`)
@@ -282,6 +250,8 @@ client.on("interactionCreate", async interaction => {
             const channel = await interaction.guild.channels.create({
                 name: `ticket-${category}-${interaction.user.id}-${number}`,
                 type: ChannelType.GuildText,
+                parent: categoryId,
+
                 permissionOverwrites: [
                     {
                         id: interaction.guild.id,
@@ -328,11 +298,12 @@ client.on("interactionCreate", async interaction => {
     }
 
     // =================================================
-    // CLOSE + TRANSCRIPT
+    // BUTTONS (CLOSE + EMBED EDITOR)
     // =================================================
 
     if (interaction.isButton()) {
 
+        // CLOSE TICKET
         if (interaction.customId === "close_ticket") {
 
             const messages = await interaction.channel.messages.fetch({ limit: 100 });
@@ -360,9 +331,7 @@ client.on("interactionCreate", async interaction => {
                 });
             }
 
-            await interaction.reply({
-                content: "🔒 Zavírám ticket..."
-            });
+            await interaction.reply({ content: "🔒 Zavírám ticket..." });
 
             setTimeout(() => {
                 interaction.channel.delete().catch(() => {});
@@ -371,46 +340,86 @@ client.on("interactionCreate", async interaction => {
         }
 
         // ======================
-        // EMBED SAVE (simplified)
+        // EMBED EDITOR BUTTONS
         // ======================
 
         const editor = editors.get(interaction.user.id);
         if (!editor) return;
 
+        const { embed, messageId } = editor;
+
         if (interaction.customId === "save_embed") {
 
-            const msg = await interaction.channel.messages.fetch(editor.messageId);
+            const msg = await interaction.channel.messages.fetch(messageId);
 
-            await msg.edit({ embeds: [editor.embed] });
+            await msg.edit({ embeds: [embed] });
+
+            editors.delete(interaction.user.id);
 
             return interaction.reply({
                 content: "💾 Uloženo",
                 ephemeral: true
             });
         }
+
+        const modal = new ModalBuilder();
+
+        const input = new TextInputBuilder()
+            .setCustomId("value")
+            .setStyle(TextInputStyle.Short);
+
+        if (interaction.customId === "edit_title") {
+            modal.setCustomId("modal_title").setTitle("Title");
+            input.setLabel("Title");
+        }
+
+        if (interaction.customId === "edit_desc") {
+            modal.setCustomId("modal_desc").setTitle("Description");
+            input.setStyle(TextInputStyle.Paragraph);
+            input.setLabel("Description");
+        }
+
+        if (interaction.customId === "edit_color") {
+            modal.setCustomId("modal_color").setTitle("Color");
+            input.setLabel("#ff0000");
+        }
+
+        if (interaction.customId === "edit_thumb") {
+            modal.setCustomId("modal_thumb").setTitle("Thumbnail");
+            input.setLabel("URL");
+        }
+
+        if (interaction.customId === "edit_image") {
+            modal.setCustomId("modal_image").setTitle("Image");
+            input.setLabel("URL");
+        }
+
+        modal.addComponents(new ActionRowBuilder().addComponents(input));
+
+        return interaction.showModal(modal);
     }
 
     // =================================================
-    // MODALS (EMBED CREATE)
+    // MODALS
     // =================================================
 
     if (interaction.isModalSubmit()) {
 
-        if (interaction.customId === "embed_create") {
+        const editor = editors.get(interaction.user.id);
+        if (!editor) return;
 
-            const embed = new EmbedBuilder()
-                .setTitle(interaction.fields.getTextInputValue("title"))
-                .setDescription(interaction.fields.getTextInputValue("desc"))
-                .setColor(interaction.fields.getTextInputValue("color") || "#0099ff");
+        const value = interaction.fields.getTextInputValue("value");
 
-            const thumb = interaction.fields.getTextInputValue("thumb");
-            const image = interaction.fields.getTextInputValue("image");
+        if (interaction.customId === "modal_title") editor.embed.setTitle(value);
+        if (interaction.customId === "modal_desc") editor.embed.setDescription(value);
+        if (interaction.customId === "modal_color") editor.embed.setColor(value);
+        if (interaction.customId === "modal_thumb") editor.embed.setThumbnail(value);
+        if (interaction.customId === "modal_image") editor.embed.setImage(value);
 
-            if (thumb) embed.setThumbnail(thumb);
-            if (image) embed.setImage(image);
-
-            return interaction.reply({ embeds: [embed] });
-        }
+        return interaction.reply({
+            content: "✔ Upraveno",
+            ephemeral: true
+        });
     }
 });
 
