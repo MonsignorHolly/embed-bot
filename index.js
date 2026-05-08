@@ -113,7 +113,7 @@ client.on("interactionCreate", async interaction => {
                 embeds: [
                     new EmbedBuilder()
                         .setTitle("📘 Help")
-                        .setColor("#ffc414")
+                        .setColor("#1f09e6")
                         .setDescription(
                             "**🎫 Ticket**\n/ticket-panel\n\n" +
                             "**🧾 Embed**\n/embed\n/embed-editor\n\n" +
@@ -131,7 +131,7 @@ client.on("interactionCreate", async interaction => {
                 .setCustomId("ticket_select")
                 .setPlaceholder("Vyber kategorii")
                 .addOptions([
-                    { label: "Pomoc", value: "pomoc", emoji: "🛠️" },
+                    { label: "Všeobecná podpora", value: "podpora", emoji: "🛠️" },
                     { label: "Report", value: "report", emoji: "🚨" },
                     { label: "Partner", value: "partner", emoji: "🤝" },
                     { label: "Frakce", value: "frakce", emoji: "🏛️" },
@@ -143,7 +143,7 @@ client.on("interactionCreate", async interaction => {
                 embeds: [
                     new EmbedBuilder()
                         .setTitle("🎫 Ticket System")
-                        .setColor("#ffc414")
+                        .setColor("#1f09e6")
                 ],
                 components: [new ActionRowBuilder().addComponents(menu)]
             });
@@ -248,7 +248,7 @@ client.on("interactionCreate", async interaction => {
             const number = count + 1;
 
             const channel = await interaction.guild.channels.create({
-                name: `ticket-${category}-${interaction.user.id}-${number}`,
+                name: `${ticket-${category}-${interaction.user.username}-${number}`,
                 type: ChannelType.GuildText,
                 parent: categoryId,
 
@@ -283,9 +283,9 @@ client.on("interactionCreate", async interaction => {
                 content: `<@${interaction.user.id}>`,
                 embeds: [
                     new EmbedBuilder()
-                        .setTitle("🎫 Ticket")
+                        .setTitle("🎫 LexionRP.cz - Ticket Systém")
                         .setDescription(`Kategorie: ${category}`)
-                        .setColor("#00ff99")
+                        .setColor("#1f09e6")
                 ],
                 components: [new ActionRowBuilder().addComponents(close)]
             });
