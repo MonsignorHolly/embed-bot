@@ -132,12 +132,12 @@ client.on("interactionCreate", async interaction => {
                 .setCustomId("ticket_select")
                 .setPlaceholder("Vyber kategorii")
                 .addOptions([
-                    { label: "Pomoc", value: "pomoc", emoji: "🛠️" },
-                    { label: "Report", value: "report", emoji: "🚨" },
-                    { label: "Partner", value: "partner", emoji: "🤝" },
-                    { label: "Frakce", value: "frakce", emoji: "🏛️" },
-                    { label: "CK", value: "ck", emoji: "☠️" },
-                    { label: "Shop", value: "shop", emoji: "🛒" }
+                    { label: "Všeobecná podpora", value: "podpora", emoji: "🛠️" },
+                    { label: "Nahlášení hráče", value: "report", emoji: "🚨" },
+                    { label: "Žádost o spolupráci", value: "partner", emoji: "🤝" },
+                    { label: "Žádost o frakci", value: "frakce", emoji: "🏛️" },
+                    { label: "Žádost o CK", value: "ck", emoji: "☠️" },
+                    { label: "Obchod", value: "shop", emoji: "🛒" }
                 ]);
 
             return interaction.reply({
@@ -145,6 +145,7 @@ client.on("interactionCreate", async interaction => {
                     new EmbedBuilder()
                         .setTitle("🎫 Ticket System")
                         .setColor(EMBED_COLOR)
+                        .setFooter("(c) 2026 LexionRP.cz - all rights reserved.
                 ],
                 components: [new ActionRowBuilder().addComponents(menu)]
             });
