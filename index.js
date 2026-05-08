@@ -1,5 +1,5 @@
-// index.js
-const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+const fs = require("fs");
+
 const {
     Client,
     GatewayIntentBits,
@@ -12,13 +12,26 @@ const {
     TextInputStyle,
     SlashCommandBuilder,
     REST,
-    Routes
+    Routes,
+    StringSelectMenuBuilder,
+    ChannelType,
+    PermissionsBitField,
+    AttachmentBuilder
 } = require("discord.js");
+
 require("dotenv").config();
 
-// =====================
+// ======================
+// CONFIG
+// ======================
+
+const SUPPORT_ROLE_ID = "1484591886940377219";
+const TRANSCRIPT_CHANNEL_ID = "1502368876892127342";
+
+// ======================
 // CLIENT
-// =====================
+// ======================
+
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -27,382 +40,382 @@ const client = new Client({
     ]
 });
 
-// Uložené editory: podle uživatele
+// ======================
+// EMBED EDITORS
+// ======================
+
 const editors = new Map();
 
-// =====================
-// REGISTRACE SLASH CMD
-// =====================
+// ======================
+// COMMANDS
+// ======================
+
 const commands = [
+
+    new SlashCommandBuilder()
+        .setName("ticket-panel")
+        .setDescription("Otevře ticket menu"),
+
     new SlashCommandBuilder()
         .setName("embed")
-        .setDescription("Vytvoří kompletní embed podle zadaných parametrů")
-        .addStringOption(opt =>
-            opt.setName("title")
-                .setDescription("Název embedu")
-                .setRequired(true)
-        )
-        .addStringOption(opt =>
-            opt.setName("description")
-                .setDescription("Popis embedu")
-                .setRequired(true)
-        )
-        .addStringOption(opt =>
-            opt.setName("color")
-                .setDescription("Barva embedu (hex nebo název)")
-                .setRequired(false)
-        )
-        .addStringOption(opt =>
-            opt.setName("thumbnail")
-                .setDescription("URL náhledu (thumbnail)")
-                .setRequired(false)
-        )
-        .addStringOption(opt =>
-            opt.setName("image")
-                .setDescription("URL obrázku")
-                .setRequired(false)
-        )
-        .addStringOption(opt =>
-            opt.setName("footer")
-                .setDescription("Text ve footeru")
-                .setRequired(false)
-        )
-        .addStringOption(opt =>
-            opt.setName("field_name")
-                .setDescription("Název pole (field)")
-                .setRequired(false)
-        )
-        .addStringOption(opt =>
-            opt.setName("field_value")
-                .setDescription("Hodnota pole (field)")
-                .setRequired(false)
-        ),
+        .setDescription("Vytvořit embed"),
 
     new SlashCommandBuilder()
         .setName("embed-editor")
-        .setDescription("Otevře editor existujícího embedu")
+        .setDescription("Upravit embed")
         .addStringOption(opt =>
             opt.setName("message_id")
-                .setDescription("ID zprávy s embedem v tomto kanálu")
+                .setDescription("ID zprávy")
                 .setRequired(true)
         ),
+
     new SlashCommandBuilder()
         .setName("help")
-        .setDescription("Nevíš si rady? Využij tento command!"),
-    
-    new SlashCommandBuilder()
-        .setName("vtip")
-        .setDescription("Tento příkaz ti zašle vtip z Webu Alik.cz")
-        
+        .setDescription("Zobrazí všechny příkazy")
+
 ].map(c => c.toJSON());
+
+// ======================
+// REGISTER
+// ======================
 
 const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
 
-// =====================
+// ======================
 // READY
-// =====================
-client.once("ready", async () => {
-    console.log(`✅ Přihlášen jako ${client.user.tag}`);
+// ======================
 
-    try {
-        await rest.put(
-            Routes.applicationCommands(client.user.id),
-            { body: commands }
-        );
-        console.log("✅ Slash příkazy zaregistrovány.");
-    } catch (err) {
-        console.error("❌ Chyba při registraci příkazů:", err);
-    }
+client.once("ready", async () => {
+    console.log(`✅ Logged as ${client.user.tag}`);
+
+    await rest.put(
+        Routes.applicationCommands(client.user.id),
+        { body: commands }
+    );
 });
 
-// =====================
-// INTERACTION HANDLER
-// =====================
-client.on("interactionCreate", async interaction => {
-    // -----------------
-    // SLASH COMMANDS
-    // -----------------
-    if (interaction.isChatInputCommand()) {
-        const { commandName } = interaction;
-        if (interaction.commandName === "help") {
-            const helpEmbed = new EmbedBuilder()
-                .setTitle("🔗 Příkazy Bota 🔗")
-                .setColor("#ffc414")
-                .setDescription(
-                    "• **/embed** — Vytvoříte si embed\n" +
-                    "• **/embed-editor** — Upravíte stávající embed"
-                )
-                .setFooter({ text: "Made by monsignorholly"})
-                .setTimestamp();
-            return interaction.reply({embeds: [helpEmbed], ephemeral: true});
-        }
-        
-        let posledniVtipy = [];
+// ======================
+// INTERACTIONS
+// ======================
 
-        if (interaction.commandName === 'vtip') {
-            try {
-                const res = await fetch("https://raw.githubusercontent.com/pehapkari/pehapkari.cz/master/source/_data/jokes.json");
-                const data = await res.json();
-        
-                // náhodný vtip
-                let vtip = null;
-                let pokusy = 0;
-        
-                while (!vtip && pokusy < 10) {
-                    const nahodny = data[Math.floor(Math.random() * data.length)].joke;
-        
-                    if (!posledniVtipy.includes(nahodny)) {
-                        vtip = nahodny;
-                    }
-        
-                    pokusy++;
-                }
-        
-                if (!vtip) {
-                    vtip = "Dneska už jsem vyčerpal všechny vtipy 😅";
-                }
-        
-                // uložíme do historie
-                posledniVtipy.push(vtip);
-                if (posledniVtipy.length > 10) posledniVtipy.shift();
-        
-                return interaction.reply({
-                    content: `😂 **Náhodný vtip:**\n\n${vtip}`,
-                    ephemeral: true
-                });
-        
-            } catch (err) {
-                console.error(err);
-                return interaction.reply({
-                    content: "⚠️ Nepodařilo se načíst vtip.",
-                    ephemeral: true
-                });
-            }
-        }
-        
-        // /embed
-        if (commandName === "embed") {
-            const title = interaction.options.getString("title");
-            const description = interaction.options.getString("description");
-            const color = interaction.options.getString("color") || "#0099ff";
-            const thumbnail = interaction.options.getString("thumbnail");
-            const image = interaction.options.getString("image");
-            const footer = interaction.options.getString("footer");
-            const fieldName = interaction.options.getString("field_name");
-            const fieldValue = interaction.options.getString("field_value");
+client.on("interactionCreate", async interaction => {
+
+    // =================================================
+    // SLASH COMMANDS
+    // =================================================
+
+    if (interaction.isChatInputCommand()) {
+
+        // ======================
+        // HELP
+        // ======================
+
+        if (interaction.commandName === "help") {
 
             const embed = new EmbedBuilder()
-                .setTitle(title)
-                .setDescription(description)
-                .setColor(color)
-                .setTimestamp();
+                .setTitle("📘 Help menu")
+                .setColor("#ffc414")
+                .setDescription(
+                    "**🎫 TICKETY**\n" +
+                    "/ticket-panel - otevře ticket menu\n\n" +
 
-            if (thumbnail) embed.setThumbnail(thumbnail);
-            if (image) embed.setImage(image);
-            if (footer) embed.setFooter({ text: footer });
-            if (fieldName && fieldValue) {
-                embed.addFields({ name: fieldName, value: fieldValue });
-            }
+                    "**🧾 EMBED SYSTEM**\n" +
+                    "/embed - vytvoření embedu\n" +
+                    "/embed-editor - úprava embedu\n\n" +
 
-            return interaction.reply({ embeds: [embed] });
+                    "**ℹ️ OSTATNÍ**\n" +
+                    "/help - seznam příkazů"
+                );
+
+            return interaction.reply({
+                embeds: [embed],
+                ephemeral: true
+            });
         }
 
-        // /embed-editor
-        if (commandName === "embed-editor") {
-            const messageId = interaction.options.getString("message_id");
+        // ======================
+        // TICKET PANEL
+        // ======================
 
-            const targetMessage = await interaction.channel.messages
-                .fetch(messageId)
-                .catch(() => null);
+        if (interaction.commandName === "ticket-panel") {
 
-            if (!targetMessage || !targetMessage.embeds[0]) {
+            const menu = new StringSelectMenuBuilder()
+                .setCustomId("ticket_select")
+                .setPlaceholder("Vyber kategorii")
+                .addOptions([
+                    { label: "Pomoc", value: "pomoc", emoji: "🛠️" },
+                    { label: "Report", value: "report", emoji: "🚨" },
+                    { label: "Partner", value: "partner", emoji: "🤝" },
+                    { label: "Frakce", value: "frakce", emoji: "🏛️" },
+                    { label: "CK", value: "ck", emoji: "☠️" },
+                    { label: "Shop", value: "shop", emoji: "🛒" }
+                ]);
+
+            const embed = new EmbedBuilder()
+                .setTitle("🎫 Ticket System")
+                .setDescription("Vyber kategorii ticketu")
+                .setColor("#ffc414");
+
+            return interaction.reply({
+                embeds: [embed],
+                components: [new ActionRowBuilder().addComponents(menu)]
+            });
+        }
+
+        // ======================
+        // EMBED CREATOR
+        // ======================
+
+        if (interaction.commandName === "embed") {
+
+            const modal = new ModalBuilder()
+                .setCustomId("embed_create")
+                .setTitle("Vytvořit Embed");
+
+            const title = new TextInputBuilder()
+                .setCustomId("title")
+                .setLabel("Název")
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true);
+
+            const desc = new TextInputBuilder()
+                .setCustomId("desc")
+                .setLabel("Popis")
+                .setStyle(TextInputStyle.Paragraph)
+                .setRequired(true);
+
+            const color = new TextInputBuilder()
+                .setCustomId("color")
+                .setLabel("Barva (#ff0000)")
+                .setStyle(TextInputStyle.Short)
+                .setRequired(false);
+
+            const thumb = new TextInputBuilder()
+                .setCustomId("thumb")
+                .setLabel("Thumbnail URL")
+                .setStyle(TextInputStyle.Short)
+                .setRequired(false);
+
+            const image = new TextInputBuilder()
+                .setCustomId("image")
+                .setLabel("Image URL")
+                .setStyle(TextInputStyle.Short)
+                .setRequired(false);
+
+            modal.addComponents(
+                new ActionRowBuilder().addComponents(title),
+                new ActionRowBuilder().addComponents(desc),
+                new ActionRowBuilder().addComponents(color),
+                new ActionRowBuilder().addComponents(thumb),
+                new ActionRowBuilder().addComponents(image)
+            );
+
+            return interaction.showModal(modal);
+        }
+
+        // ======================
+        // EMBED EDITOR
+        // ======================
+
+        if (interaction.commandName === "embed-editor") {
+
+            const id = interaction.options.getString("message_id");
+
+            const msg = await interaction.channel.messages.fetch(id).catch(() => null);
+
+            if (!msg || !msg.embeds[0]) {
                 return interaction.reply({
-                    content: "❌ Zpráva neexistuje nebo neobsahuje embed.",
+                    content: "❌ Embed nenalezen",
                     ephemeral: true
                 });
             }
 
-            const embed = EmbedBuilder.from(targetMessage.embeds[0]);
-
-            // Uložíme editor pro tohoto uživatele
             editors.set(interaction.user.id, {
-                messageId,
-                embed
+                messageId: id,
+                embed: EmbedBuilder.from(msg.embeds[0])
             });
 
             const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId("edit_title")
-                    .setLabel("✏️ Název")
-                    .setStyle(ButtonStyle.Primary),
-                new ButtonBuilder()
-                    .setCustomId("edit_description")
-                    .setLabel("📝 Popis")
-                    .setStyle(ButtonStyle.Primary),
-                new ButtonBuilder()
-                    .setCustomId("edit_color")
-                    .setLabel("🎨 Barva")
-                    .setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder()
-                    .setCustomId("edit_image")
-                    .setLabel("🖼️ Obrázek")
-                    .setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder()
-                    .setCustomId("save_embed")
-                    .setLabel("💾 Uložit")
-                    .setStyle(ButtonStyle.Success)
+                new ButtonBuilder().setCustomId("edit_title").setLabel("Title").setStyle(ButtonStyle.Primary),
+                new ButtonBuilder().setCustomId("edit_desc").setLabel("Desc").setStyle(ButtonStyle.Primary),
+                new ButtonBuilder().setCustomId("edit_color").setLabel("Color").setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId("edit_thumb").setLabel("Thumbnail").setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId("edit_image").setLabel("Image").setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId("save_embed").setLabel("Save").setStyle(ButtonStyle.Success)
             );
 
             return interaction.reply({
-                content: "🛠️ Editor embedu je připraven. Použij tlačítka níže.",
+                content: "🛠️ Editor aktivní",
                 components: [row],
                 ephemeral: true
             });
         }
     }
 
-    // -----------------
-    // BUTTONS
-    // -----------------
-    if (interaction.isButton()) {
-        const editor = editors.get(interaction.user.id);
-        if (!editor) {
-            return interaction.reply({
-                content: "❌ Nemáš aktivní editor.",
-                ephemeral: true
-            });
-        }
+    // =================================================
+    // TICKETS
+    // =================================================
 
-        const { embed, messageId } = editor;
-        const id = interaction.customId;
+    if (interaction.isStringSelectMenu()) {
 
-        // TITLE
-        if (id === "edit_title") {
-            const modal = new ModalBuilder()
-                .setCustomId("modal_title")
-                .setTitle("Upravit název");
+        if (interaction.customId === "ticket_select") {
 
-            const input = new TextInputBuilder()
-                .setCustomId("new_title")
-                .setLabel("Nový název")
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true);
+            const category = interaction.values[0];
 
-            modal.addComponents(new ActionRowBuilder().addComponents(input));
-            return interaction.showModal(modal);
-        }
+            const existing = interaction.guild.channels.cache.find(c =>
+                c.name.startsWith(`ticket-${category}-${interaction.user.id}`)
+            );
 
-        // DESCRIPTION
-        if (id === "edit_description") {
-            const modal = new ModalBuilder()
-                .setCustomId("modal_description")
-                .setTitle("Upravit popis");
-
-            const input = new TextInputBuilder()
-                .setCustomId("new_description")
-                .setLabel("Nový popis")
-                .setStyle(TextInputStyle.Paragraph)
-                .setRequired(true);
-
-            modal.addComponents(new ActionRowBuilder().addComponents(input));
-            return interaction.showModal(modal);
-        }
-
-        // COLOR
-        if (id === "edit_color") {
-            const modal = new ModalBuilder()
-                .setCustomId("modal_color")
-                .setTitle("Upravit barvu");
-
-            const input = new TextInputBuilder()
-                .setCustomId("new_color")
-                .setLabel("Hex barva (#ff0000)")
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true);
-
-            modal.addComponents(new ActionRowBuilder().addComponents(input));
-            return interaction.showModal(modal);
-        }
-
-        // IMAGE
-        if (id === "edit_image") {
-            const modal = new ModalBuilder()
-                .setCustomId("modal_image")
-                .setTitle("Upravit obrázek");
-
-            const input = new TextInputBuilder()
-                .setCustomId("new_image")
-                .setLabel("URL obrázku")
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true);
-
-            modal.addComponents(new ActionRowBuilder().addComponents(input));
-            return interaction.showModal(modal);
-        }
-
-        // SAVE
-        if (id === "save_embed") {
-            const msg = await interaction.channel.messages
-                .fetch(messageId)
-                .catch(() => null);
-
-            if (!msg) {
+            if (existing) {
                 return interaction.reply({
-                    content: "❌ Původní zpráva nebyla nalezena.",
+                    content: "❌ Už máš ticket v této kategorii",
                     ephemeral: true
                 });
             }
 
-            await msg.edit({ embeds: [embed] });
+            const count = interaction.guild.channels.cache.filter(c =>
+                c.name.startsWith(`ticket-${category}-`)
+            ).size;
+
+            const number = count + 1;
+
+            const channel = await interaction.guild.channels.create({
+                name: `ticket-${category}-${interaction.user.id}-${number}`,
+                type: ChannelType.GuildText,
+                permissionOverwrites: [
+                    {
+                        id: interaction.guild.id,
+                        deny: [PermissionsBitField.Flags.ViewChannel]
+                    },
+                    {
+                        id: interaction.user.id,
+                        allow: [
+                            PermissionsBitField.Flags.ViewChannel,
+                            PermissionsBitField.Flags.SendMessages
+                        ]
+                    },
+                    {
+                        id: SUPPORT_ROLE_ID,
+                        allow: [
+                            PermissionsBitField.Flags.ViewChannel,
+                            PermissionsBitField.Flags.SendMessages
+                        ]
+                    }
+                ]
+            });
+
+            const close = new ButtonBuilder()
+                .setCustomId("close_ticket")
+                .setLabel("Zavřít ticket")
+                .setStyle(ButtonStyle.Danger);
+
+            await channel.send({
+                content: `<@${interaction.user.id}>`,
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("🎫 Ticket")
+                        .setDescription(`Kategorie: ${category}`)
+                        .setColor("#00ff99")
+                ],
+                components: [new ActionRowBuilder().addComponents(close)]
+            });
 
             return interaction.reply({
-                content: "💾 Embed uložen.",
+                content: `✅ Ticket vytvořen: ${channel}`,
                 ephemeral: true
             });
         }
     }
 
-    // -----------------
-    // MODALS
-    // -----------------
-    if (interaction.isModalSubmit()) {
+    // =================================================
+    // CLOSE + TRANSCRIPT
+    // =================================================
+
+    if (interaction.isButton()) {
+
+        if (interaction.customId === "close_ticket") {
+
+            const messages = await interaction.channel.messages.fetch({ limit: 100 });
+
+            const transcript = messages
+                .map(m =>
+                    `[${new Date(m.createdTimestamp).toLocaleString()}] ${m.author.tag}: ${m.content}`
+                )
+                .reverse()
+                .join("\n");
+
+            const fileName = `transcript-${interaction.channel.id}.txt`;
+
+            fs.writeFileSync(fileName, transcript);
+
+            const file = new AttachmentBuilder(fileName);
+
+            const logChannel =
+                interaction.guild.channels.cache.get(TRANSCRIPT_CHANNEL_ID);
+
+            if (logChannel) {
+                await logChannel.send({
+                    content: "📄 Ticket transcript",
+                    files: [file]
+                });
+            }
+
+            await interaction.reply({
+                content: "🔒 Zavírám ticket..."
+            });
+
+            setTimeout(() => {
+                interaction.channel.delete().catch(() => {});
+                fs.unlinkSync(fileName);
+            }, 3000);
+        }
+
+        // ======================
+        // EMBED SAVE (simplified)
+        // ======================
+
         const editor = editors.get(interaction.user.id);
-        if (!editor) {
+        if (!editor) return;
+
+        if (interaction.customId === "save_embed") {
+
+            const msg = await interaction.channel.messages.fetch(editor.messageId);
+
+            await msg.edit({ embeds: [editor.embed] });
+
             return interaction.reply({
-                content: "❌ Nemáš aktivní editor.",
+                content: "💾 Uloženo",
                 ephemeral: true
             });
         }
+    }
 
-        const { embed } = editor;
+    // =================================================
+    // MODALS (EMBED CREATE)
+    // =================================================
 
-        if (interaction.customId === "modal_title") {
-            const value = interaction.fields.getTextInputValue("new_title");
-            embed.setTitle(value);
-            return interaction.reply({ content: "✔ Název upraven.", ephemeral: true });
-        }
+    if (interaction.isModalSubmit()) {
 
-        if (interaction.customId === "modal_description") {
-            const value = interaction.fields.getTextInputValue("new_description");
-            embed.setDescription(value);
-            return interaction.reply({ content: "✔ Popis upraven.", ephemeral: true });
-        }
+        if (interaction.customId === "embed_create") {
 
-        if (interaction.customId === "modal_color") {
-            const value = interaction.fields.getTextInputValue("new_color");
-            embed.setColor(value);
-            return interaction.reply({ content: "✔ Barva upravena.", ephemeral: true });
-        }
+            const embed = new EmbedBuilder()
+                .setTitle(interaction.fields.getTextInputValue("title"))
+                .setDescription(interaction.fields.getTextInputValue("desc"))
+                .setColor(interaction.fields.getTextInputValue("color") || "#0099ff");
 
-        if (interaction.customId === "modal_image") {
-            const value = interaction.fields.getTextInputValue("new_image");
-            embed.setImage(value);
-            return interaction.reply({ content: "✔ Obrázek upraven.", ephemeral: true });
+            const thumb = interaction.fields.getTextInputValue("thumb");
+            const image = interaction.fields.getTextInputValue("image");
+
+            if (thumb) embed.setThumbnail(thumb);
+            if (image) embed.setImage(image);
+
+            return interaction.reply({ embeds: [embed] });
         }
     }
 });
 
-// =====================
+// ======================
 // LOGIN
-// =====================
+// ======================
+
 client.login(process.env.TOKEN);
