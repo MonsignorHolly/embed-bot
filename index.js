@@ -287,12 +287,12 @@ client.on("interactionCreate", async interaction => {
                 .setStyle(ButtonStyle.Danger);
 
             await channel.send({
-                content: `<@${interaction.user.id}>`,
+                content: "Zdravím <@${interaction.user.id}>",
                 embeds: [
                     new EmbedBuilder()
                         .setTitle("🎫 Ticket")
                         .setColor(EMBED_COLOR)
-                        .setDescription(`Kategorie: ${category}`)
+                        .setDescription("Prosíme, aby jsi mezitím, než se ti ozve člen podpory, sepsal/a pečlivě tvůj problém.")
                 ],
                 components: [new ActionRowBuilder().addComponents(close)]
             });
