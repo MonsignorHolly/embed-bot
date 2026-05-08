@@ -248,7 +248,11 @@ client.on("interactionCreate", async interaction => {
             const number = count + 1;
 
             const channel = await interaction.guild.channels.create({
-                name: `${ticket-${category}-${interaction.user.username}-${number}`,
+                const username = interaction.user.username
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]/g, "-");
+                
+                    name: `ticket-${category}-${username}-${number}`,
                 type: ChannelType.GuildText,
                 parent: categoryId,
 
