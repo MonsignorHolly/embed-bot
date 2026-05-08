@@ -61,15 +61,15 @@ const editors = new Map();
 const commands = [
     new SlashCommandBuilder()
         .setName("ticket-panel")
-        .setDescription("Otevře ticket menu"),
+        .setDescription("Vytvoří ticket-panel"),
 
     new SlashCommandBuilder()
         .setName("embed")
-        .setDescription("Vytvoří embed"),
+        .setDescription("Vytvoří nový embed"),
 
     new SlashCommandBuilder()
         .setName("embed-editor")
-        .setDescription("Upraví embed")
+        .setDescription("Upraví existující")
         .addStringOption(opt =>
             opt.setName("message_id")
                 .setDescription("ID zprávy")
@@ -78,7 +78,7 @@ const commands = [
 
     new SlashCommandBuilder()
         .setName("help")
-        .setDescription("Help menu")
+        .setDescription("Seznam příkazů, kterými bot disponuje")
 ].map(c => c.toJSON());
 
 const rest = new REST({ version: "10" }).setToken(TOKEN);
@@ -143,7 +143,8 @@ client.on("interactionCreate", async interaction => {
             return interaction.reply({
                 embeds: [
                     new EmbedBuilder()
-                        .setTitle("🎫 Ticket System")
+                        .setTitle("🎫 Ticket Systém")
+                        .setDescription("🛩️ Ticket systém, nejdůležitější část našeho Discordu.\nDíky níž Vám můžeme být oporou i mimo hru. 💙")
                         .setColor(EMBED_COLOR)
                         .setFooter({text: "(c) 2026 LexionRP.cz - all rights reserved."})
                 ],
