@@ -145,7 +145,7 @@ client.on("interactionCreate", async interaction => {
                     new EmbedBuilder()
                         .setTitle("🎫 Ticket System")
                         .setColor(EMBED_COLOR)
-                        .setFooter("(c) 2026 LexionRP.cz - all rights reserved.
+                        .setFooter("(c) 2026 LexionRP.cz - all rights reserved.")
                 ],
                 components: [new ActionRowBuilder().addComponents(menu)]
             });
