@@ -48,16 +48,14 @@ const TICKET_CATEGORIES = {
 };
 
 // ======================
-// REACTION ROLES (FIXED)
+// REACTION ROLES STORAGE
 // ======================
 
 const RR_FILE = "./reactionRoles.json";
 
-let reactionRoles = {};
-
-if (fs.existsSync(RR_FILE)) {
-    reactionRoles = JSON.parse(fs.readFileSync(RR_FILE, "utf8"));
-}
+let reactionRoles = fs.existsSync(RR_FILE)
+    ? JSON.parse(fs.readFileSync(RR_FILE, "utf8"))
+    : {};
 
 function saveRR() {
     fs.writeFileSync(RR_FILE, JSON.stringify(reactionRoles, null, 2));
@@ -74,7 +72,8 @@ const client = new Client({
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMessageReactions
-    ]
+    ],
+    partials: ["MESSAGE", "CHANNEL", "REACTION"]
 });
 
 // ======================
@@ -101,6 +100,10 @@ const commands = [
         ),
 
     new SlashCommandBuilder()
+        .setName("reaction-role-panel")
+        .setDescription("Vytvoří reaction role panel"),
+
+    new SlashCommandBuilder()
         .setName("help")
         .setDescription("Seznam příkazů")
 ].map(c => c.toJSON());
@@ -121,7 +124,7 @@ client.once("ready", async () => {
 });
 
 // ======================
-// HELP FUNCTION
+// HELP
 // ======================
 
 function rrEmbed(messageId) {
@@ -130,11 +133,11 @@ function rrEmbed(messageId) {
 
     const desc = Object.entries(data.roles || {})
         .map(([emoji, role]) => `${emoji} → <@&${role}>`)
-        .join("\n") || "Žádné role";
+        .join("\n");
 
     return new EmbedBuilder()
         .setTitle("🎭 Reaction Roles")
-        .setDescription(desc)
+        .setDescription(desc || "Žádné role")
         .setColor(EMBED_COLOR);
 }
 
@@ -157,13 +160,39 @@ client.on("interactionCreate", async interaction => {
                     new EmbedBuilder()
                         .setTitle("📘 Help")
                         .setColor(EMBED_COLOR)
-                        .setDescription("🎫 /ticket-panel\n🧾 /embed\n🛠️ /embed-editor")
+                        .setDescription(
+                            "🎫 /ticket-panel\n🧾 /embed\n🛠️ /embed-editor\n🎭 /reaction-role-panel"
+                        )
                 ]
             });
         }
 
         // ======================
-        // TICKET PANEL (FIXED)
+        // REACTION ROLE PANEL
+        // ======================
+
+        if (interaction.commandName === "reaction-role-panel") {
+            if (!hasAccess(interaction.member))
+                return interaction.reply({ content: "❌ No access", ephemeral: true });
+
+            const embed = new EmbedBuilder()
+                .setTitle("🎭 Reaction Roles")
+                .setDescription("Reaguj na emoji pro role")
+                .setColor(EMBED_COLOR);
+
+            const msg = await interaction.reply({
+                embeds: [embed],
+                fetchReply: true
+            });
+
+            reactionRoles[msg.id] = { roles: {} };
+            saveRR();
+
+            return;
+        }
+
+        // ======================
+        // TICKET PANEL
         // ======================
 
         if (interaction.commandName === "ticket-panel") {
@@ -193,7 +222,7 @@ client.on("interactionCreate", async interaction => {
         }
 
         // ======================
-        // EMBED (FIXED)
+        // EMBED CREATE
         // ======================
 
         if (interaction.commandName === "embed") {
@@ -228,7 +257,7 @@ client.on("interactionCreate", async interaction => {
         }
 
         // ======================
-        // EMBED EDITOR (FIXED SAVE + COPY + SAFE STATE)
+        // EMBED EDITOR
         // ======================
 
         if (interaction.commandName === "embed-editor") {
@@ -246,11 +275,11 @@ client.on("interactionCreate", async interaction => {
                 return interaction.editReply("❌ Nenalezeno");
             }
 
-            if (!msg.embeds[0]) return interaction.editReply("❌ No embed");
+            if (!msg.embeds[0])
+                return interaction.editReply("❌ No embed");
 
             editors.set(interaction.user.id, {
                 messageId: id,
-                channelId: interaction.channel.id,
                 embed: EmbedBuilder.from(msg.embeds[0])
             });
 
@@ -278,7 +307,6 @@ client.on("interactionCreate", async interaction => {
 
         const editor = editors.get(interaction.user.id);
 
-        // COPY
         if (interaction.customId === "editor_copy") {
             if (!editor)
                 return interaction.reply({ content: "❌ Expired", ephemeral: true });
@@ -297,7 +325,6 @@ COLOR: ${e.data.color || "none"}
             });
         }
 
-        // SAVE
         if (interaction.customId === "save_embed") {
             if (!editor)
                 return interaction.reply({ content: "❌ Expired", ephemeral: true });
@@ -310,7 +337,6 @@ COLOR: ${e.data.color || "none"}
             return interaction.reply({ content: "💾 Saved", ephemeral: true });
         }
 
-        // EDIT MODAL
         if (editor) {
             const modal = new ModalBuilder()
                 .setCustomId(interaction.customId)
@@ -354,27 +380,63 @@ COLOR: ${e.data.color || "none"}
 client.on("messageReactionAdd", async (reaction, user) => {
     if (user.bot) return;
 
+    if (reaction.partial) await reaction.fetch();
+
     const data = reactionRoles[reaction.message.id];
     if (!data) return;
 
-    const roleId = data.roles[reaction.emoji.name];
+    const roleId = data.roles?.[reaction.emoji.name];
     if (!roleId) return;
 
     const member = await reaction.message.guild.members.fetch(user.id);
-    member.roles.add(roleId).catch(() => {});
+    if (member) member.roles.add(roleId).catch(() => {});
 });
 
 client.on("messageReactionRemove", async (reaction, user) => {
     if (user.bot) return;
 
+    if (reaction.partial) await reaction.fetch();
+
     const data = reactionRoles[reaction.message.id];
     if (!data) return;
 
-    const roleId = data.roles[reaction.emoji.name];
+    const roleId = data.roles?.[reaction.emoji.name];
     if (!roleId) return;
 
     const member = await reaction.message.guild.members.fetch(user.id);
-    member.roles.remove(roleId).catch(() => {});
+    if (member) member.roles.remove(roleId).catch(() => {});
+});
+
+// ======================
+// WELCOME SYSTEM
+// ======================
+
+client.on("guildMemberAdd", async member => {
+    try {
+        const channel = member.guild.channels.cache.get(WELCOME_CHANNEL_ID);
+        if (!channel) return;
+
+        const welcomeEmbed = new EmbedBuilder()
+            .setTitle("🛩️ Vítej na LexionRP! 🛩️")
+            .setDescription(
+                `Zdravíme tě na našem Discord serveru, ${member}!\n\n` +
+                `📌 Přečti si pravidla serveru.\n` +
+                `🎫 Pokud potřebuješ pomoc, vytvoř si ticket v kategorii TICKET.\n` +
+                `🚀 Jsme WL-ON Server, to znamená, že nám jde především o kvalitu Roleplaye. My jsme Lexion, více než jen Roleplay.!`
+            )
+            .setColor(EMBED_COLOR)
+            .setImage(WELCOME_IMAGE_URL)
+            .setFooter({ text: "(c) 2026 LexionRP.cz - all rights reserved." })
+            .setTimestamp();
+
+        await channel.send({
+            content: `🎉 ${member.guild.memberCount}. připojený člen!`,
+            embeds: [welcomeEmbed]
+        });
+
+    } catch (err) {
+        console.error("❌ Welcome error:", err);
+    }
 });
 
 // ======================
