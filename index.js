@@ -24,6 +24,11 @@ const {
 // CONFIG
 // ======================
 
+const ADMIN_ROLE_ID = "1502506274292633670";
+function hasAccess(member) {
+    return member.roles.cache.has(ADMIN_ROLE_ID);
+}
+
 const TOKEN = process.env.TOKEN;
 
 const EMBED_COLOR = "#1302d1";
@@ -130,7 +135,12 @@ client.on("interactionCreate", async interaction => {
         }
 
         if (interaction.commandName === "ticket-panel") {
-
+            if (!hasAccess(interaction.member)) {
+                return interaction.reply({
+                    content: "❌ Nemáš oprávnění použít tento příkaz.",
+                    ephemeral: true
+                });
+            }
             const menu = new StringSelectMenuBuilder()
                 .setCustomId("ticket_select")
                 .setPlaceholder("Vyber kategorii")
@@ -156,7 +166,12 @@ client.on("interactionCreate", async interaction => {
         }
 
         if (interaction.commandName === "embed") {
-
+            if (!hasAccess(interaction.member)) {
+                return interaction.reply({
+                    content: "❌ Nemáš oprávnění použít tento příkaz.",
+                    ephemeral: true
+                });
+            }
             const modal = new ModalBuilder()
                 .setCustomId("embed_create")
                 .setTitle("Vytvořit embed");
@@ -185,8 +200,13 @@ client.on("interactionCreate", async interaction => {
         }
 
         if (interaction.commandName === "embed-editor") {
-
-            // ❗ důležité - zabrání "Aplikace neodpovídá"
+            if (!hasAccess(interaction.member)) {
+                return interaction.reply({
+                    content: "❌ Nemáš oprávnění použít tento příkaz.",
+                    ephemeral: true
+                });
+            }
+            
             await interaction.deferReply({ ephemeral: true });
         
             const id = interaction.options.getString("message_id");
