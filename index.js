@@ -208,7 +208,7 @@ client.on("interactionCreate", async interaction => {
             }
             
             await interaction.deferReply({ ephemeral: true });
-        
+            await interaction.editReply("⏳ Načítám embed...");
             const id = interaction.options.getString("message_id");
         
             let msg;
@@ -221,7 +221,9 @@ client.on("interactionCreate", async interaction => {
             if (!msg || !msg.embeds || !msg.embeds[0]) {
                 return interaction.editReply("❌ Tato zpráva neobsahuje embed.");
             }
-        
+            if (!msg) {
+                return interaction.editReply("❌ Zpráva nenalezena.");
+            }
             // uloží editor session
             editors.set(interaction.user.id, {
                 messageId: id,
@@ -385,7 +387,7 @@ client.on("interactionCreate", async interaction => {
         if (interaction.customId === "close_ticket") {
 
             await interaction.deferReply({ ephemeral: true }).catch(() => {});
-
+            
             try {
                 const messages = await interaction.channel.messages.fetch({ limit: 100 });
 
@@ -455,7 +457,7 @@ client.on("interactionCreate", async interaction => {
                 });
             }
         
-            const msg = await interaction.channel.messages.fetch(data.messageId);
+            msg = await interaction.channel.messages.fetch(id).catch(() => null);
             await msg.edit({ embeds: [data.embed] });
         
             editors.delete(interaction.user.id);
