@@ -28,6 +28,10 @@ const TOKEN = process.env.TOKEN;
 
 const EMBED_COLOR = "#1302d1";
 
+// WELCOME SYSTEM
+const WELCOME_CHANNEL_ID = "https://discord.com/channels/1484591886865006765/1484591887997206732";
+const WELCOME_IMAGE_URL = "https://cdn.discordapp.com/attachments/1180856807166586991/1502494064707240100/Navrh_bez_nazvu.png?ex=69ffea24&is=69fe98a4&hm=e905359085b8edaa8e1ecf9c5b151d7287464bc296ee08172f72f35a6c7b4740&";
+// TICKET SYSTEM
 const SUPPORT_ROLE_ID = "1484591886940377219";
 const TRANSCRIPT_CHANNEL_ID = "1502368876892127342";
 
@@ -47,6 +51,7 @@ const TICKET_CATEGORIES = {
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent
     ]
@@ -438,6 +443,39 @@ client.on("interactionCreate", async interaction => {
     }
 });
 
+// ======================
+// WELCOME MESSAGE
+// ======================
+
+client.on("guildMemberAdd", async member => {
+    try {
+        const channel = member.guild.channels.cache.get(WELCOME_CHANNEL_ID);
+
+        if (!channel) return;
+
+        const welcomeEmbed = new EmbedBuilder()
+            .setTitle("🛩️ Vítej na LexionRP! 🛩️")
+            .setDescription(
+                `Zdravíme tě na našem Discord serveru, ${member}!\n\n` +
+                `📌 Přečti si pravidla serveru.\n` +
+                `🎫 Pokud potřebuješ pomoc, vytvoř si ticket v kategorii TICKET.\n` +
+                `🚀 Jsme WL-ON Server, to znamená, že nám jde především o kvalitu Roleplaye. My jsme Lexion, více než jen Roleplay.!`
+            )
+            .setColor(EMBED_COLOR)
+            .setImage(WELCOME_IMAGE_URL)
+            .setFooter({
+                text: "(c) 2026 LexionRP.cz - all rights reserved."
+            })
+            .setTimestamp();
+
+        await channel.send({
+            embeds: [welcomeEmbed]
+        });
+
+    } catch (error) {
+        console.error("❌ Chyba při odesílání uvítací zprávy:", error);
+    }
+});
 // ======================
 // LOGIN
 // ======================
