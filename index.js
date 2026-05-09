@@ -186,35 +186,40 @@ client.on("interactionCreate", async interaction => {
 
         if (interaction.commandName === "embed-editor") {
 
+            // ❗ důležité - zabrání "Aplikace neodpovídá"
+            await interaction.deferReply({ ephemeral: true });
+        
             const id = interaction.options.getString("message_id");
-
-            const msg = await interaction.channel.messages.fetch(id).catch(() => null);
-
-            if (!msg || !msg.embeds[0]) {
-                return interaction.reply({
-                    content: "❌ Embed nenalezen",
-                    ephemeral: true
-                });
+        
+            let msg;
+            try {
+                msg = await interaction.channel.messages.fetch(id);
+            } catch (err) {
+                return interaction.editReply("❌ Zpráva nenalezena nebo nemáš přístup.");
             }
-
+        
+            if (!msg || !msg.embeds || !msg.embeds[0]) {
+                return interaction.editReply("❌ Tato zpráva neobsahuje embed.");
+            }
+        
+            // uloží editor session
             editors.set(interaction.user.id, {
                 messageId: id,
+                channelId: interaction.channel.id,
                 embed: EmbedBuilder.from(msg.embeds[0])
             });
-
+        
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder().setCustomId("edit_title").setLabel("Title").setStyle(ButtonStyle.Primary),
                 new ButtonBuilder().setCustomId("edit_desc").setLabel("Desc").setStyle(ButtonStyle.Primary),
                 new ButtonBuilder().setCustomId("edit_color").setLabel("Color").setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder().setCustomId("edit_thumb").setLabel("Thumbnail").setStyle(ButtonStyle.Secondary),
                 new ButtonBuilder().setCustomId("edit_image").setLabel("Image").setStyle(ButtonStyle.Secondary),
                 new ButtonBuilder().setCustomId("save_embed").setLabel("Save").setStyle(ButtonStyle.Success)
             );
-
-            return interaction.reply({
-                content: "🛠️ Editor aktivní",
-                components: [row],
-                ephemeral: true
+        
+            return interaction.editReply({
+                content: "🛠️ Embed editor aktivní",
+                components: [row]
             });
         }
     }
@@ -370,19 +375,32 @@ client.on("interactionCreate", async interaction => {
 
         const editor = editors.get(interaction.user.id);
 
-        if (!editor) return;
+        if (!editor) {
+            return interaction.reply({
+                content: "❌ Editor neexistuje nebo expiroval.",
+                ephemeral: true
+            });
+        }
 
         const { embed, messageId } = editor;
 
         if (interaction.customId === "save_embed") {
 
-            const msg = await interaction.channel.messages.fetch(messageId);
-            await msg.edit({ embeds: [embed] });
-
+            const data = editors.get(interaction.user.id);
+            if (!data) {
+                return interaction.reply({
+                    content: "❌ Editor expiroval.",
+                    ephemeral: true
+                });
+            }
+        
+            const msg = await interaction.channel.messages.fetch(data.messageId);
+            await msg.edit({ embeds: [data.embed] });
+        
             editors.delete(interaction.user.id);
-
+        
             return interaction.reply({
-                content: "💾 Uloženo",
+                content: "💾 Embed uložen",
                 ephemeral: true
             });
         }
