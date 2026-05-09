@@ -234,6 +234,7 @@ client.on("interactionCreate", async interaction => {
                 new ButtonBuilder().setCustomId("edit_desc").setLabel("Desc").setStyle(ButtonStyle.Primary),
                 new ButtonBuilder().setCustomId("edit_color").setLabel("Color").setStyle(ButtonStyle.Secondary),
                 new ButtonBuilder().setCustomId("edit_image").setLabel("Image").setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId("editor_copy").setLabel("📋 Copy original").setStyle(ButtonStyle.Secondary),
                 new ButtonBuilder().setCustomId("save_embed").setLabel("Save").setStyle(ButtonStyle.Success)
             );
         
@@ -336,7 +337,47 @@ client.on("interactionCreate", async interaction => {
     // ======================
 
     if (interaction.isButton()) {
+        if (interaction.customId === "editor_copy") {
 
+            const editor = editors.get(interaction.user.id);
+        
+            if (!editor) {
+                return interaction.reply({
+                    content: "❌ Editor expiroval.",
+                    ephemeral: true
+                });
+            }
+        
+            const embed = editor.embed;
+        
+            const text = `
+        📋 ORIGINAL EMBED COPY
+        
+        TITLE:
+        ${embed.data.title || "none"}
+        
+        DESCRIPTION:
+        ${embed.data.description || "none"}
+        
+        COLOR:
+        ${embed.data.color || "none"}
+        
+        IMAGE:
+        ${embed.data.image?.url || "none"}
+        
+        THUMBNAIL:
+        ${embed.data.thumbnail?.url || "none"}
+            `.trim();
+        
+            return interaction.reply({
+                content: "📋 Zkopíruj si text:",
+                ephemeral: true,
+                files: [{
+                    attachment: Buffer.from(text),
+                    name: "embed-copy.txt"
+                }]
+            });
+        }
         // ======================
         // CLOSE TICKET (FIX pořadí + safe return)
         // ======================
@@ -403,7 +444,7 @@ client.on("interactionCreate", async interaction => {
         }
 
         const { embed, messageId } = editor;
-
+        
         if (interaction.customId === "save_embed") {
 
             const data = editors.get(interaction.user.id);
