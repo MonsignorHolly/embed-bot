@@ -468,7 +468,9 @@ client.on("guildMemberAdd", async member => {
             })
             .setTimestamp();
 
+        // Odeslání zprávy
         await channel.send({
+            content: `🎉 ${member.guild.memberCount}. připojený člen!`,
             embeds: [welcomeEmbed]
         });
 
