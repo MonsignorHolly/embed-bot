@@ -215,15 +215,24 @@ client.on("interactionCreate", async interaction => {
         const editor = editors.get(interaction.user.id);
 
         if (interaction.customId === "edit_rr") {
+            if (!editor) return;
             rrSessions.set(interaction.user.id, {
                 messageId: editor.messageId,
                 roles: reactionRoles[editor.messageId]?.roles || {}
             });
-
             return interaction.reply({
                 ephemeral: true,
                 content: "Napiš: emoji roleID"
             });
+        }
+
+        if (interaction.customId === "save_embed") {
+            if (!editor) return;
+            await interaction.deferUpdate();
+            const msg = await interaction.channel.messages.fetch(editor.messageId);
+            await msg.edit({ embeds: [editor.embed] });
+            editors.delete(interaction.user.id);
+            return interaction.editReply({ content: "✅ Uloženo!", components: [] });
         }
 
         if (!editor) return;
@@ -255,12 +264,6 @@ client.on("interactionCreate", async interaction => {
         if (interaction.customId === "edit_desc") editor.embed.setDescription(value);
         if (interaction.customId === "edit_color") editor.embed.setColor(value);
         if (interaction.customId === "edit_image") editor.embed.setImage(value);
-
-        if (interaction.customId === "save_embed") {
-            const msg = await interaction.channel.messages.fetch(editor.messageId);
-            await msg.edit({ embeds: [editor.embed] });
-            editors.delete(interaction.user.id);
-        }
 
         return interaction.reply({ content: "✔ OK", ephemeral: true });
     }
