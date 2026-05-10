@@ -15,6 +15,7 @@ const {
     REST,
     Routes,
     StringSelectMenuBuilder,
+    RoleSelectMenuBuilder,
 } = require("discord.js");
 
 const ADMIN_ROLE_ID = "1502506274292633670";
@@ -63,6 +64,9 @@ const client = new Client({
 
 const editors = new Map();
 
+// Temporary storage for role add/remove sessions
+const roleSessions = new Map();
+
 const commands = [
     new SlashCommandBuilder().setName("ticket-panel").setDescription("Vytvoří ticket-panel"),
     new SlashCommandBuilder().setName("embed").setDescription("Vytvoří nový embed"),
@@ -75,6 +79,29 @@ const commands = [
     new SlashCommandBuilder()
         .setName("reaction-role-panel")
         .setDescription("Vytvoří reaction role panel"),
+    new SlashCommandBuilder()
+        .setName("role")
+        .setDescription("Správa reaction rolí")
+        .addSubcommand(sub =>
+            sub.setName("add")
+                .setDescription("Přidá reaction roli do panelu")
+                .addStringOption(opt =>
+                    opt.setName("message_id").setDescription("ID reaction role panelu").setRequired(true)
+                )
+                .addStringOption(opt =>
+                    opt.setName("emoji").setDescription("Emoji pro roli").setRequired(true)
+                )
+        )
+        .addSubcommand(sub =>
+            sub.setName("remove")
+                .setDescription("Odebere reaction roli z panelu")
+                .addStringOption(opt =>
+                    opt.setName("message_id").setDescription("ID reaction role panelu").setRequired(true)
+                )
+                .addStringOption(opt =>
+                    opt.setName("emoji").setDescription("Emoji k odebrání").setRequired(true)
+                )
+        ),
     new SlashCommandBuilder()
         .setName("help")
         .setDescription("Seznam příkazů")
@@ -101,7 +128,9 @@ client.on("interactionCreate", async interaction => {
                     new EmbedBuilder()
                         .setTitle("📘 Help")
                         .setColor(EMBED_COLOR)
-                        .setDescription("🎫 /ticket-panel\n🧾 /embed\n🛠️ /embed-editor\n🎭 /reaction-role-panel")
+                        .setDescription(
+                            "🎫 /ticket-panel\n🧾 /embed\n🛠️ /embed-editor\n🎭 /reaction-role-panel\n➕ /role add\n➖ /role remove"
+                        )
                 ]
             });
         }
@@ -156,6 +185,7 @@ client.on("interactionCreate", async interaction => {
                             .setCustomId(f[0])
                             .setLabel(f[1])
                             .setStyle(f[2])
+                            .setRequired(false)
                     )
                 )
             );
@@ -191,6 +221,7 @@ client.on("interactionCreate", async interaction => {
 
             editors.set(interaction.user.id, {
                 messageId: id,
+                channelId: interaction.channel.id,
                 embed: EmbedBuilder.from(msg.embeds[0])
             });
 
@@ -200,7 +231,7 @@ client.on("interactionCreate", async interaction => {
                 new ButtonBuilder().setCustomId("edit_color").setLabel("Color").setStyle(ButtonStyle.Secondary),
                 new ButtonBuilder().setCustomId("edit_image").setLabel("Image").setStyle(ButtonStyle.Secondary),
                 new ButtonBuilder().setCustomId("edit_rr").setLabel("🎭 RR").setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder().setCustomId("save_embed").setLabel("Save").setStyle(ButtonStyle.Success)
+                new ButtonBuilder().setCustomId("save_embed").setLabel("💾 Save").setStyle(ButtonStyle.Success)
             );
 
             return interaction.editReply({
@@ -208,8 +239,95 @@ client.on("interactionCreate", async interaction => {
                 components: [row]
             });
         }
+
+        // ======================
+        // ROLE ADD / REMOVE
+        // ======================
+        if (interaction.commandName === "role") {
+            if (!hasAccess(interaction.member))
+                return interaction.reply({ content: "❌ Nemáš oprávnění", ephemeral: true });
+
+            const sub = interaction.options.getSubcommand();
+            const messageId = interaction.options.getString("message_id");
+            const emoji = interaction.options.getString("emoji");
+
+            if (sub === "add") {
+                if (!reactionRoles[messageId])
+                    return interaction.reply({ content: "❌ Panel s tímto ID neexistuje", ephemeral: true });
+
+                roleSessions.set(interaction.user.id, { action: "add", messageId, emoji });
+
+                const roleMenu = new RoleSelectMenuBuilder()
+                    .setCustomId("role_select_add")
+                    .setPlaceholder("Vyber roli")
+                    .setMinValues(1)
+                    .setMaxValues(1);
+
+                return interaction.reply({
+                    ephemeral: true,
+                    content: `➕ Vyber roli pro emoji **${emoji}**:`,
+                    components: [new ActionRowBuilder().addComponents(roleMenu)]
+                });
+            }
+
+            if (sub === "remove") {
+                if (!reactionRoles[messageId])
+                    return interaction.reply({ content: "❌ Panel s tímto ID neexistuje", ephemeral: true });
+
+                const roles = reactionRoles[messageId].roles;
+
+                if (!roles[emoji])
+                    return interaction.reply({ content: `❌ Emoji **${emoji}** není v panelu`, ephemeral: true });
+
+                delete roles[emoji];
+                saveRR();
+
+                // Remove reaction from the panel message
+                const channel = interaction.channel;
+                const panelMsg = await channel.messages.fetch(messageId).catch(() => null);
+                if (panelMsg) {
+                    const reaction = panelMsg.reactions.cache.find(r => r.emoji.name === emoji);
+                    if (reaction) await reaction.remove().catch(() => {});
+                }
+
+                return interaction.reply({
+                    ephemeral: true,
+                    content: `✅ Emoji **${emoji}** bylo odebráno z panelu`
+                });
+            }
+        }
     }
 
+    // ======================
+    // ROLE SELECT MENU
+    // ======================
+    if (interaction.isRoleSelectMenu()) {
+        if (interaction.customId === "role_select_add") {
+            const session = roleSessions.get(interaction.user.id);
+            if (!session) return interaction.reply({ content: "❌ Session vypršela", ephemeral: true });
+
+            const role = interaction.roles.first();
+            if (!role) return interaction.reply({ content: "❌ Žádná role", ephemeral: true });
+
+            reactionRoles[session.messageId].roles[session.emoji] = role.id;
+            saveRR();
+
+            roleSessions.delete(interaction.user.id);
+
+            // Add reaction to the panel message
+            const panelMsg = await interaction.channel.messages.fetch(session.messageId).catch(() => null);
+            if (panelMsg) await panelMsg.react(session.emoji).catch(() => {});
+
+            return interaction.update({
+                content: `✅ Přidáno: ${session.emoji} → <@&${role.id}>`,
+                components: []
+            });
+        }
+    }
+
+    // ======================
+    // BUTTONS
+    // ======================
     if (interaction.isButton()) {
 
         const editor = editors.get(interaction.user.id);
@@ -229,7 +347,8 @@ client.on("interactionCreate", async interaction => {
         if (interaction.customId === "save_embed") {
             if (!editor) return;
             await interaction.deferUpdate();
-            const msg = await interaction.channel.messages.fetch(editor.messageId);
+            const channel = await client.channels.fetch(editor.channelId);
+            const msg = await channel.messages.fetch(editor.messageId);
             await msg.edit({ embeds: [editor.embed] });
             editors.delete(interaction.user.id);
             return interaction.editReply({ content: "✅ Uloženo!", components: [] });
@@ -237,24 +356,55 @@ client.on("interactionCreate", async interaction => {
 
         if (!editor) return;
 
+        const labels = {
+            edit_title: "Nový title",
+            edit_desc: "Nový popis",
+            edit_color: "Nová barva (hex)",
+            edit_image: "Nová URL obrázku"
+        };
+
         const modal = new ModalBuilder()
             .setCustomId(interaction.customId)
-            .setTitle("Edit");
+            .setTitle("✏️ Upravit embed");
 
         modal.addComponents(
             new ActionRowBuilder().addComponents(
                 new TextInputBuilder()
                     .setCustomId("value")
-                    .setLabel("Value")
-                    .setStyle(TextInputStyle.Short)
+                    .setLabel(labels[interaction.customId] || "Value")
+                    .setStyle(
+                        interaction.customId === "edit_desc"
+                            ? TextInputStyle.Paragraph
+                            : TextInputStyle.Short
+                    )
+                    .setRequired(true)
             )
         );
 
         return interaction.showModal(modal);
     }
 
+    // ======================
+    // MODALS
+    // ======================
     if (interaction.isModalSubmit()) {
 
+        // Embed create modal
+        if (interaction.customId === "embed_create") {
+            const title = interaction.fields.getTextInputValue("title");
+            const desc = interaction.fields.getTextInputValue("desc");
+            const color = interaction.fields.getTextInputValue("color");
+            const image = interaction.fields.getTextInputValue("image");
+
+            const embed = new EmbedBuilder().setColor(color || EMBED_COLOR);
+            if (title) embed.setTitle(title);
+            if (desc) embed.setDescription(desc);
+            if (image) embed.setImage(image);
+
+            return interaction.reply({ embeds: [embed] });
+        }
+
+        // Embed editor modals
         const editor = editors.get(interaction.user.id);
         if (!editor) return;
 
@@ -265,10 +415,13 @@ client.on("interactionCreate", async interaction => {
         if (interaction.customId === "edit_color") editor.embed.setColor(value);
         if (interaction.customId === "edit_image") editor.embed.setImage(value);
 
-        return interaction.reply({ content: "✔ OK", ephemeral: true });
+        return interaction.reply({ content: "✔ Změna uložena, klikni Save pro aplikování", ephemeral: true });
     }
 });
 
+// ======================
+// RR INPUT (legacy chat)
+// ======================
 client.on("messageCreate", async message => {
     if (message.author.bot) return;
 
@@ -284,6 +437,9 @@ client.on("messageCreate", async message => {
     await message.react(emoji).catch(() => {});
 });
 
+// ======================
+// REACTIONS
+// ======================
 client.on("messageReactionAdd", async (reaction, user) => {
     if (user.bot) return;
 
@@ -310,6 +466,9 @@ client.on("messageReactionRemove", async (reaction, user) => {
     member.roles.remove(roleId).catch(() => {});
 });
 
+// ======================
+// WELCOME
+// ======================
 client.on("guildMemberAdd", async member => {
     const channel = member.guild.channels.cache.get(WELCOME_CHANNEL_ID);
     if (!channel) return;
@@ -328,4 +487,7 @@ client.on("guildMemberAdd", async member => {
     channel.send({ embeds: [embed] });
 });
 
+// ======================
+// LOGIN
+// ======================
 client.login(TOKEN);
