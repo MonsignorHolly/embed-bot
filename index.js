@@ -17,10 +17,6 @@ const {
     StringSelectMenuBuilder,
 } = require("discord.js");
 
-// ======================
-// CONFIG
-// ======================
-
 const ADMIN_ROLE_ID = "1502506274292633670";
 function hasAccess(member) {
     return member.roles.cache.has(ADMIN_ROLE_ID);
@@ -29,11 +25,9 @@ function hasAccess(member) {
 const TOKEN = process.env.TOKEN;
 const EMBED_COLOR = "#1302d1";
 
-// WELCOME
 const WELCOME_CHANNEL_ID = "1484591887997206732";
 const WELCOME_IMAGE_URL = "https://cdn.discordapp.com/attachments/1180856807166586991/1502494064707240100/Navrh_bez_nazvu.png";
 
-// TICKET
 const SUPPORT_ROLE_ID = "1484591886940377219";
 
 const TICKET_CATEGORIES = {
@@ -44,10 +38,6 @@ const TICKET_CATEGORIES = {
     report: "1502366625238876201",
     partner: "1502366896811675658"
 };
-
-// ======================
-// REACTION ROLES
-// ======================
 
 const RR_FILE = "./reactionRoles.json";
 
@@ -61,10 +51,6 @@ function saveRR() {
 
 const rrSessions = new Map();
 
-// ======================
-// CLIENT
-// ======================
-
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -75,15 +61,7 @@ const client = new Client({
     ]
 });
 
-// ======================
-// EDITORS
-// ======================
-
 const editors = new Map();
-
-// ======================
-// COMMANDS
-// ======================
 
 const commands = [
     new SlashCommandBuilder().setName("ticket-panel").setDescription("Vytvoří ticket-panel"),
@@ -92,7 +70,7 @@ const commands = [
         .setName("embed-editor")
         .setDescription("Upraví existující embed")
         .addStringOption(opt =>
-            opt.setName("message_id").setRequired(true)
+            opt.setName("message_id").setDescription("ID zprávy k úpravě").setRequired(true)
         ),
     new SlashCommandBuilder()
         .setName("reaction-role-panel")
@@ -104,28 +82,16 @@ const commands = [
 
 const rest = new REST({ version: "10" }).setToken(TOKEN);
 
-// ======================
-// READY
-// ======================
-
 client.once("ready", async () => {
     console.log(`✅ Logged as ${client.user.tag}`);
-
     await rest.put(
         Routes.applicationCommands(client.user.id),
         { body: commands }
     );
 });
 
-// ======================
-// HELP
-// ======================
-
 client.on("interactionCreate", async interaction => {
 
-    // ======================
-    // SLASH COMMANDS
-    // ======================
     if (interaction.isChatInputCommand()) {
 
         if (interaction.commandName === "help") {
@@ -135,16 +101,11 @@ client.on("interactionCreate", async interaction => {
                     new EmbedBuilder()
                         .setTitle("📘 Help")
                         .setColor(EMBED_COLOR)
-                        .setDescription(
-                            "🎫 /ticket-panel\n🧾 /embed\n🛠️ /embed-editor\n🎭 /reaction-role-panel"
-                        )
+                        .setDescription("🎫 /ticket-panel\n🧾 /embed\n🛠️ /embed-editor\n🎭 /reaction-role-panel")
                 ]
             });
         }
 
-        // ======================
-        // TICKET PANEL (NEZMĚNĚNO)
-        // ======================
         if (interaction.commandName === "ticket-panel") {
             if (!hasAccess(interaction.member))
                 return interaction.reply({ content: "❌ Nemáš oprávnění", ephemeral: true });
@@ -173,9 +134,6 @@ client.on("interactionCreate", async interaction => {
             });
         }
 
-        // ======================
-        // EMBED
-        // ======================
         if (interaction.commandName === "embed") {
             if (!hasAccess(interaction.member))
                 return interaction.reply({ content: "❌ Nemáš oprávnění", ephemeral: true });
@@ -205,9 +163,6 @@ client.on("interactionCreate", async interaction => {
             return interaction.showModal(modal);
         }
 
-        // ======================
-        // REACTION ROLE PANEL
-        // ======================
         if (interaction.commandName === "reaction-role-panel") {
             if (!hasAccess(interaction.member))
                 return interaction.reply({ content: "❌ Nemáš oprávnění", ephemeral: true });
@@ -223,9 +178,6 @@ client.on("interactionCreate", async interaction => {
             saveRR();
         }
 
-        // ======================
-        // EMBED EDITOR
-        // ======================
         if (interaction.commandName === "embed-editor") {
             if (!hasAccess(interaction.member))
                 return interaction.reply({ content: "❌ Nemáš oprávnění", ephemeral: true });
@@ -233,7 +185,6 @@ client.on("interactionCreate", async interaction => {
             await interaction.deferReply({ ephemeral: true });
 
             const id = interaction.options.getString("message_id");
-
             const msg = await interaction.channel.messages.fetch(id).catch(() => null);
             if (!msg || !msg.embeds[0])
                 return interaction.editReply("❌ Nenalezeno");
@@ -259,9 +210,6 @@ client.on("interactionCreate", async interaction => {
         }
     }
 
-    // ======================
-    // BUTTONS
-    // ======================
     if (interaction.isButton()) {
 
         const editor = editors.get(interaction.user.id);
@@ -296,9 +244,6 @@ client.on("interactionCreate", async interaction => {
         return interaction.showModal(modal);
     }
 
-    // ======================
-    // MODALS
-    // ======================
     if (interaction.isModalSubmit()) {
 
         const editor = editors.get(interaction.user.id);
@@ -321,9 +266,6 @@ client.on("interactionCreate", async interaction => {
     }
 });
 
-// ======================
-// RR INPUT
-// ======================
 client.on("messageCreate", async message => {
     if (message.author.bot) return;
 
@@ -333,16 +275,12 @@ client.on("messageCreate", async message => {
     const [emoji, roleId] = message.content.split(" ");
 
     session.roles[emoji] = roleId;
-
     reactionRoles[session.messageId] = { roles: session.roles };
     saveRR();
 
     await message.react(emoji).catch(() => {});
 });
 
-// ======================
-// REACTIONS
-// ======================
 client.on("messageReactionAdd", async (reaction, user) => {
     if (user.bot) return;
 
@@ -369,9 +307,6 @@ client.on("messageReactionRemove", async (reaction, user) => {
     member.roles.remove(roleId).catch(() => {});
 });
 
-// ======================
-// WELCOME (PŮVODNÍ BEZ ZMĚN)
-// ======================
 client.on("guildMemberAdd", async member => {
     const channel = member.guild.channels.cache.get(WELCOME_CHANNEL_ID);
     if (!channel) return;
@@ -390,7 +325,4 @@ client.on("guildMemberAdd", async member => {
     channel.send({ embeds: [embed] });
 });
 
-// ======================
-// LOGIN
-// ======================
 client.login(TOKEN);
