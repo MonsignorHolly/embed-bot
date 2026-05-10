@@ -50,7 +50,27 @@ function saveRR() {
     fs.writeFileSync(RR_FILE, JSON.stringify(reactionRoles, null, 2));
 }
 
+function buildRRDescription(roles) {
+    const lines = Object.entries(roles).map(([emoji, roleId]) => `${emoji} - <@&${roleId}>`);
+    return lines.length > 0 ? lines.join("\n") : "Reaguj pro role";
+}
+
+async function updateRRPanel(channel, messageId) {
+    const panelMsg = await channel.messages.fetch(messageId).catch(() => null);
+    if (!panelMsg) return;
+
+    const data = reactionRoles[messageId];
+    if (!data) return;
+
+    const oldEmbed = panelMsg.embeds[0];
+    const updatedEmbed = EmbedBuilder.from(oldEmbed)
+        .setDescription(buildRRDescription(data.roles));
+
+    await panelMsg.edit({ embeds: [updatedEmbed] }).catch(() => {});
+}
+
 const rrSessions = new Map();
+const roleSessions = new Map();
 
 const client = new Client({
     intents: [
@@ -63,9 +83,6 @@ const client = new Client({
 });
 
 const editors = new Map();
-
-// Temporary storage for role add/remove sessions
-const roleSessions = new Map();
 
 const commands = [
     new SlashCommandBuilder().setName("ticket-panel").setDescription("Vytvoří ticket-panel"),
@@ -204,7 +221,7 @@ client.on("interactionCreate", async interaction => {
 
             const msg = await interaction.reply({ embeds: [embed], fetchReply: true });
 
-            reactionRoles[msg.id] = { roles: {} };
+            reactionRoles[msg.id] = { roles: {}, channelId: interaction.channel.id };
             saveRR();
         }
 
@@ -240,9 +257,6 @@ client.on("interactionCreate", async interaction => {
             });
         }
 
-        // ======================
-        // ROLE ADD / REMOVE
-        // ======================
         if (interaction.commandName === "role") {
             if (!hasAccess(interaction.member))
                 return interaction.reply({ content: "❌ Nemáš oprávnění", ephemeral: true });
@@ -255,7 +269,7 @@ client.on("interactionCreate", async interaction => {
                 if (!reactionRoles[messageId])
                     return interaction.reply({ content: "❌ Panel s tímto ID neexistuje", ephemeral: true });
 
-                roleSessions.set(interaction.user.id, { action: "add", messageId, emoji });
+                roleSessions.set(interaction.user.id, { action: "add", messageId, emoji, channelId: interaction.channel.id });
 
                 const roleMenu = new RoleSelectMenuBuilder()
                     .setCustomId("role_select_add")
@@ -282,12 +296,16 @@ client.on("interactionCreate", async interaction => {
                 delete roles[emoji];
                 saveRR();
 
-                // Remove reaction from the panel message
-                const channel = interaction.channel;
-                const panelMsg = await channel.messages.fetch(messageId).catch(() => null);
+                const panelMsg = await interaction.channel.messages.fetch(messageId).catch(() => null);
                 if (panelMsg) {
                     const reaction = panelMsg.reactions.cache.find(r => r.emoji.name === emoji);
                     if (reaction) await reaction.remove().catch(() => {});
+
+                    // Update panel description
+                    const oldEmbed = panelMsg.embeds[0];
+                    const updatedEmbed = EmbedBuilder.from(oldEmbed)
+                        .setDescription(buildRRDescription(roles));
+                    await panelMsg.edit({ embeds: [updatedEmbed] }).catch(() => {});
                 }
 
                 return interaction.reply({
@@ -314,9 +332,18 @@ client.on("interactionCreate", async interaction => {
 
             roleSessions.delete(interaction.user.id);
 
-            // Add reaction to the panel message
-            const panelMsg = await interaction.channel.messages.fetch(session.messageId).catch(() => null);
-            if (panelMsg) await panelMsg.react(session.emoji).catch(() => {});
+            const channel = await client.channels.fetch(session.channelId);
+            const panelMsg = await channel.messages.fetch(session.messageId).catch(() => null);
+            if (panelMsg) {
+                // Add reaction
+                await panelMsg.react(session.emoji).catch(() => {});
+
+                // Update panel description
+                const oldEmbed = panelMsg.embeds[0];
+                const updatedEmbed = EmbedBuilder.from(oldEmbed)
+                    .setDescription(buildRRDescription(reactionRoles[session.messageId].roles));
+                await panelMsg.edit({ embeds: [updatedEmbed] }).catch(() => {});
+            }
 
             return interaction.update({
                 content: `✅ Přidáno: ${session.emoji} → <@&${role.id}>`,
@@ -389,7 +416,6 @@ client.on("interactionCreate", async interaction => {
     // ======================
     if (interaction.isModalSubmit()) {
 
-        // Embed create modal
         if (interaction.customId === "embed_create") {
             const title = interaction.fields.getTextInputValue("title");
             const desc = interaction.fields.getTextInputValue("desc");
@@ -404,7 +430,6 @@ client.on("interactionCreate", async interaction => {
             return interaction.reply({ embeds: [embed] });
         }
 
-        // Embed editor modals
         const editor = editors.get(interaction.user.id);
         if (!editor) return;
 
