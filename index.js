@@ -31,6 +31,15 @@ const WELCOME_IMAGE_URL = "https://cdn.discordapp.com/attachments/11808568071665
 
 const SUPPORT_ROLE_ID = "1484591886940377219";
 
+const AUTOROLE_IDS = [
+    "1484591886927659039",
+    "1502249604144697344",
+    "1484591886927659041",
+    "1502248635151159416",
+    "1503108855842865305",
+    "1502249732905635860"
+];
+
 const TICKET_CATEGORIES = {
     frakce: "1485272944270901420",
     ck: "1502366579625820340",
@@ -53,20 +62,6 @@ function saveRR() {
 function buildRRDescription(roles) {
     const lines = Object.entries(roles).map(([emoji, roleId]) => `${emoji} - <@&${roleId}>`);
     return lines.length > 0 ? lines.join("\n") : "Reaguj pro role";
-}
-
-async function updateRRPanel(channel, messageId) {
-    const panelMsg = await channel.messages.fetch(messageId).catch(() => null);
-    if (!panelMsg) return;
-
-    const data = reactionRoles[messageId];
-    if (!data) return;
-
-    const oldEmbed = panelMsg.embeds[0];
-    const updatedEmbed = EmbedBuilder.from(oldEmbed)
-        .setDescription(buildRRDescription(data.roles));
-
-    await panelMsg.edit({ embeds: [updatedEmbed] }).catch(() => {});
 }
 
 const rrSessions = new Map();
@@ -301,7 +296,6 @@ client.on("interactionCreate", async interaction => {
                     const reaction = panelMsg.reactions.cache.find(r => r.emoji.name === emoji);
                     if (reaction) await reaction.remove().catch(() => {});
 
-                    // Update panel description
                     const oldEmbed = panelMsg.embeds[0];
                     const updatedEmbed = EmbedBuilder.from(oldEmbed)
                         .setDescription(buildRRDescription(roles));
@@ -316,9 +310,6 @@ client.on("interactionCreate", async interaction => {
         }
     }
 
-    // ======================
-    // ROLE SELECT MENU
-    // ======================
     if (interaction.isRoleSelectMenu()) {
         if (interaction.customId === "role_select_add") {
             const session = roleSessions.get(interaction.user.id);
@@ -335,10 +326,8 @@ client.on("interactionCreate", async interaction => {
             const channel = await client.channels.fetch(session.channelId);
             const panelMsg = await channel.messages.fetch(session.messageId).catch(() => null);
             if (panelMsg) {
-                // Add reaction
                 await panelMsg.react(session.emoji).catch(() => {});
 
-                // Update panel description
                 const oldEmbed = panelMsg.embeds[0];
                 const updatedEmbed = EmbedBuilder.from(oldEmbed)
                     .setDescription(buildRRDescription(reactionRoles[session.messageId].roles));
@@ -352,9 +341,6 @@ client.on("interactionCreate", async interaction => {
         }
     }
 
-    // ======================
-    // BUTTONS
-    // ======================
     if (interaction.isButton()) {
 
         const editor = editors.get(interaction.user.id);
@@ -411,9 +397,6 @@ client.on("interactionCreate", async interaction => {
         return interaction.showModal(modal);
     }
 
-    // ======================
-    // MODALS
-    // ======================
     if (interaction.isModalSubmit()) {
 
         if (interaction.customId === "embed_create") {
@@ -492,12 +475,18 @@ client.on("messageReactionRemove", async (reaction, user) => {
 });
 
 // ======================
-// WELCOME
+// WELCOME + AUTOROLE
 // ======================
 client.on("guildMemberAdd", async member => {
+    
+    for (const roleId of AUTOROLE_IDS) {
+        await member.roles.add(roleId).catch(() => {});
+    }
+
     const channel = member.guild.channels.cache.get(WELCOME_CHANNEL_ID);
     if (!channel) return;
 
+    const memberCount = member.guild.memberCount;
     const embed = new EmbedBuilder()
         .setTitle("🛩️ Vítej na LexionRP! 🛩️")
         .setDescription(
@@ -509,7 +498,9 @@ client.on("guildMemberAdd", async member => {
         .setColor(EMBED_COLOR)
         .setImage(WELCOME_IMAGE_URL);
 
-    channel.send({ embeds: [embed] });
+    channel.send({ 
+        content: `Jsi náš **{memberCount}**. člen! 🤩`
+        embeds: [embed] });
 });
 
 // ======================
