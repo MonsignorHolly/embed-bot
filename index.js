@@ -1,5 +1,6 @@
 const fs = require("fs");
 require("dotenv").config();
+const Groq = require("groq-sdk");
 
 const {
     Client,
@@ -16,6 +17,7 @@ const {
     Routes,
     StringSelectMenuBuilder,
     RoleSelectMenuBuilder,
+    PermissionFlagsBits,
 } = require("discord.js");
 
 const ADMIN_ROLE_ID = "1502506274292633670";
@@ -24,10 +26,12 @@ function hasAccess(member) {
 }
 
 const TOKEN = process.env.TOKEN;
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const EMBED_COLOR = "#1302d1";
 
 const WELCOME_CHANNEL_ID = "1484591887997206732";
 const WELCOME_IMAGE_URL = "https://cdn.discordapp.com/attachments/1180856807166586991/1502494064707240100/Navrh_bez_nazvu.png";
+const CHAT_CHANNEL_ID = "1484591889154969844";
 
 const SUPPORT_ROLE_ID = "1484591886940377219";
 
@@ -50,10 +54,34 @@ const TICKET_CATEGORIES = {
 };
 
 const RR_FILE = "./reactionRoles.json";
+const PROMPT_FILE = "./prompt.txt";
 
 let reactionRoles = fs.existsSync(RR_FILE)
     ? JSON.parse(fs.readFileSync(RR_FILE, "utf8"))
     : {};
+
+let systemPrompt = fs.existsSync(PROMPT_FILE)
+    ? fs.readFileSync(PROMPT_FILE, "utf8")
+    : `Jsi LexioBot, oficiální bot Discord serveru LexionRP.cz.
+
+Server info:
+LexionRP.cz je WL-ON server zaměřený na Roleplay Los Santos. Zaměřujeme se na kvalitu, originalitu a profesionalitu.
+- Originalita: Skripty, Eventy a celkově přístup k hráčům a komunitě, kde jinde nenajdete.
+- Záleží nám na komunitě, jelikož komunita je alfa a omega úspěšného serveru.
+- Vynaložíme veškeré úsilí do pohodlného RP zážitku.
+
+Pravidla serveru: Vyhledej aktuální RP pravidla pro FiveM/GTA RP servery a aplikuj je v kontextu LexionRP.
+
+Chování:
+- Vždy komunikuj formálně a profesionálně.
+- Pomáhej hráčům s dotazy ohledně serveru, pravidel a roleplay.
+- Pokud hráč poruší Discord ToS nebo základní pravidla slušnosti a morálky, uděl mu timeout.
+- Timeout uděluj POUZE při jasném porušení, ne na základě žádosti hráče.
+- Nikdy nezneužívej své pravomoci.`;
+
+function savePrompt() {
+    fs.writeFileSync(PROMPT_FILE, systemPrompt);
+}
 
 function saveRR() {
     fs.writeFileSync(RR_FILE, JSON.stringify(reactionRoles, null, 2));
@@ -66,6 +94,9 @@ function buildRRDescription(roles) {
 
 const rrSessions = new Map();
 const roleSessions = new Map();
+const chatHistories = new Map();
+
+const groq = new Groq({ apiKey: GROQ_API_KEY });
 
 const client = new Client({
     intents: [
@@ -115,6 +146,9 @@ const commands = [
                 )
         ),
     new SlashCommandBuilder()
+        .setName("prompt")
+        .setDescription("Upraví systémový prompt LexioBota"),
+    new SlashCommandBuilder()
         .setName("help")
         .setDescription("Seznam příkazů")
 ].map(c => c.toJSON());
@@ -141,10 +175,32 @@ client.on("interactionCreate", async interaction => {
                         .setTitle("📘 Help")
                         .setColor(EMBED_COLOR)
                         .setDescription(
-                            "🎫 /ticket-panel\n🧾 /embed\n🛠️ /embed-editor\n🎭 /reaction-role-panel\n➕ /role add\n➖ /role remove"
+                            "🎫 /ticket-panel\n🧾 /embed\n🛠️ /embed-editor\n🎭 /reaction-role-panel\n➕ /role add\n➖ /role remove\n📝 /prompt"
                         )
                 ]
             });
+        }
+
+        if (interaction.commandName === "prompt") {
+            if (!hasAccess(interaction.member))
+                return interaction.reply({ content: "❌ Nemáš oprávnění", ephemeral: true });
+
+            const modal = new ModalBuilder()
+                .setCustomId("edit_prompt")
+                .setTitle("Upravit systémový prompt");
+
+            modal.addComponents(
+                new ActionRowBuilder().addComponents(
+                    new TextInputBuilder()
+                        .setCustomId("prompt_value")
+                        .setLabel("Systémový prompt")
+                        .setStyle(TextInputStyle.Paragraph)
+                        .setValue(systemPrompt)
+                        .setRequired(true)
+                )
+            );
+
+            return interaction.showModal(modal);
         }
 
         if (interaction.commandName === "ticket-panel") {
@@ -399,6 +455,16 @@ client.on("interactionCreate", async interaction => {
 
     if (interaction.isModalSubmit()) {
 
+        if (interaction.customId === "edit_prompt") {
+            if (!hasAccess(interaction.member))
+                return interaction.reply({ content: "❌ Nemáš oprávnění", ephemeral: true });
+
+            systemPrompt = interaction.fields.getTextInputValue("prompt_value");
+            savePrompt();
+            chatHistories.clear();
+            return interaction.reply({ content: "✅ Systémový prompt upraven a historie chatu vymazána!", ephemeral: true });
+        }
+
         if (interaction.customId === "embed_create") {
             const title = interaction.fields.getTextInputValue("title");
             const desc = interaction.fields.getTextInputValue("desc");
@@ -428,21 +494,68 @@ client.on("interactionCreate", async interaction => {
 });
 
 // ======================
-// RR INPUT (legacy chat)
+// CHAT (Groq AI)
 // ======================
 client.on("messageCreate", async message => {
     if (message.author.bot) return;
 
+    // RR session
     const session = rrSessions.get(message.author.id);
-    if (!session) return;
+    if (session) {
+        const [emoji, roleId] = message.content.split(" ");
+        session.roles[emoji] = roleId;
+        reactionRoles[session.messageId] = { roles: session.roles };
+        saveRR();
+        await message.react(emoji).catch(() => {});
+        return;
+    }
 
-    const [emoji, roleId] = message.content.split(" ");
+    // AI chat kanál
+    if (message.channel.id !== CHAT_CHANNEL_ID) return;
 
-    session.roles[emoji] = roleId;
-    reactionRoles[session.messageId] = { roles: session.roles };
-    saveRR();
+    const userId = message.author.id;
+    if (!chatHistories.has(userId)) chatHistories.set(userId, []);
 
-    await message.react(emoji).catch(() => {});
+    const history = chatHistories.get(userId);
+    history.push({ role: "user", content: message.content });
+
+    // Max 20 zpráv v historii
+    if (history.length > 20) history.splice(0, history.length - 20);
+
+    try {
+        await message.channel.sendTyping();
+
+        const response = await groq.chat.completions.create({
+            model: "llama-3.3-70b-versatile",
+            messages: [
+                { role: "system", content: systemPrompt },
+                ...history
+            ],
+            max_tokens: 1024,
+        });
+
+        const reply = response.choices[0]?.message?.content || "Omlouvám se, nepodařilo se mi odpovědět.";
+
+        history.push({ role: "assistant", content: reply });
+
+        // Zkontroluj jestli má udelit timeout
+        const shouldTimeout = reply.toLowerCase().includes("[timeout]");
+        const cleanReply = reply.replace(/\[timeout\]/gi, "").trim();
+
+        await message.reply(cleanReply);
+
+        if (shouldTimeout) {
+            const member = await message.guild.members.fetch(userId).catch(() => null);
+            if (member && member.moderatable) {
+                await member.timeout(5 * 60 * 1000, "Porušení pravidel serveru / Discord ToS").catch(() => {});
+                await message.channel.send(`🔇 ${member} byl umlčen na 5 minut.`);
+            }
+        }
+
+    } catch (err) {
+        console.error("Groq error:", err);
+        await message.reply("❌ Chyba při komunikaci s AI.").catch(() => {});
+    }
 });
 
 // ======================
@@ -478,7 +591,6 @@ client.on("messageReactionRemove", async (reaction, user) => {
 // WELCOME + AUTOROLE
 // ======================
 client.on("guildMemberAdd", async member => {
-    
     for (const roleId of AUTOROLE_IDS) {
         await member.roles.add(roleId).catch(() => {});
     }
@@ -487,6 +599,7 @@ client.on("guildMemberAdd", async member => {
     if (!channel) return;
 
     const memberCount = member.guild.memberCount;
+
     const embed = new EmbedBuilder()
         .setTitle("🛩️ Vítej na LexionRP! 🛩️")
         .setDescription(
@@ -498,9 +611,9 @@ client.on("guildMemberAdd", async member => {
         .setColor(EMBED_COLOR)
         .setImage(WELCOME_IMAGE_URL);
 
-    channel.send({ 
-        content: `*Jsi náš* **${memberCount}.** *člen! 🤩*`,
-        embeds: [embed] 
+    channel.send({
+        content: `🎉 Vítej na serveru! Jsi náš **${memberCount}.** člen!`,
+        embeds: [embed]
     });
 });
 
