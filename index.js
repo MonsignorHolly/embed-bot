@@ -499,8 +499,9 @@ client.on("guildMemberAdd", async member => {
         .setImage(WELCOME_IMAGE_URL);
 
     channel.send({ 
-        content: `Jsi náš **{memberCount}**. člen! 🤩`
-        embeds: [embed] });
+        content: `Jsi náš **{memberCount}**. člen! 🤩`,
+        embeds: [embed] 
+    });
 });
 
 // ======================
