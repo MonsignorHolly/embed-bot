@@ -649,11 +649,14 @@ client.on("interactionCreate", async interaction => {
     }
 });
 function sanitize(text) {
+    if (!text) return "";
     return text
-        .replace(/[\u0000-\u001F\u007F-\u009F]/g, "")
-        .replace(/\p{Cs}/gu, "")
+        .replace(/[\u0000-\u001F\u007F-\u009F]/g, "") // control chars
+        .replace(/\p{Cs}/gu, "") // nevalidní unicode
+        .replace(/\s+/g, " ") // normalize whitespace
         .trim();
 }
+
 // ======================
 // MESSAGE CREATE
 // ======================
@@ -786,6 +789,8 @@ client.on("messageCreate", async message => {
     if (!chatHistories.has(userId)) chatHistories.set(userId, []);
     
     const history = chatHistories.get(userId);
+    
+    // Uložení zprávy uživatele (sanitizované)
     history.push({ role: "user", content: sanitize(message.content) });
     if (history.length > 20) history.splice(0, history.length - 20);
     
@@ -804,15 +809,14 @@ client.on("messageCreate", async message => {
             max_tokens: 1024,
         });
     
-        const reply = response.choices[0]?.message?.content || "Omlouvám se, nepodařilo se mi odpovědět.";
-        const cleanReply = sanitize(reply);
+        const reply = sanitize(response.choices[0]?.message?.content || "Omlouvám se, nepodařilo se mi odpovědět.");
     
-        history.push({ role: "assistant", content: cleanReply });
+        history.push({ role: "assistant", content: reply });
     
-        const shouldTimeout = cleanReply.toLowerCase().includes("[timeout]");
-        const finalReply = cleanReply.replace(/\[timeout\]/gi, "").trim();
+        const shouldTimeout = reply.toLowerCase().includes("[timeout]");
+        const cleanReply = reply.replace(/\[timeout\]/gi, "").trim();
     
-        await message.reply(finalReply);
+        await message.reply(cleanReply);
     
         if (shouldTimeout) {
             const violation = await checkViolation(message);
@@ -822,7 +826,7 @@ client.on("messageCreate", async message => {
                 await sendViolationReport(message, violation);
             }
         }
-
+    
     } catch (err) {
         console.error("Groq error:", err);
         await message.reply("❌ Chyba při komunikaci s AI.").catch(() => {});
