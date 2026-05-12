@@ -648,7 +648,12 @@ client.on("interactionCreate", async interaction => {
         return interaction.reply({ content: "✔ Změna uložena, klikni Save pro aplikování", ephemeral: true });
     }
 });
-
+function sanitize(text) {
+    return text
+        .replace(/[\u0000-\u001F\u007F-\u009F]/g, "")
+        .replace(/\p{Cs}/gu, "")
+        .trim();
+}
 // ======================
 // MESSAGE CREATE
 // ======================
@@ -771,14 +776,6 @@ client.on("messageCreate", async message => {
             }
         }).catch(err => console.error("Violation check failed:", err));
     }
-
-    // Sanitizace textu pro Groq
-function sanitize(text) {
-    return text
-        .replace(/[\u0000-\u001F\u007F-\u009F]/g, "")
-        .replace(/\p{Cs}/gu, "")
-        .trim();
-}
 
     // ======================
     // AI CHAT
