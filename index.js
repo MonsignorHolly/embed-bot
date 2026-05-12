@@ -28,10 +28,18 @@ function hasAccess(member) {
 const TOKEN = process.env.TOKEN;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const EMBED_COLOR = "#1302d1";
+const FOOTER = { text: "(c) 2026 LexionRP.cz - all rights reserved." };
 
 const WELCOME_CHANNEL_ID = "1484591887997206732";
 const WELCOME_IMAGE_URL = "https://cdn.discordapp.com/attachments/1180856807166586991/1502494064707240100/Navrh_bez_nazvu.png";
 const CHAT_CHANNEL_ID = "1484591889154969844";
+const REP_CHANNEL_ID = "1484591889154969849";
+const REPORT_CHANNEL_ID = "1503844446486134865";
+
+const EXCLUDED_CATEGORIES = [
+    "1487447849133146283",
+    "1484591888664232183"
+];
 
 const SUPPORT_ROLE_ID = "1484591886940377219";
 
@@ -52,6 +60,41 @@ const TICKET_CATEGORIES = {
     report: "1502366625238876201",
     partner: "1502366896811675658"
 };
+
+const BADWORDS = [
+    "kurva", "kurvа", "pica", "píča", "picа", "kokot", "huj", "hůj", "suka", "čurák",
+    "čurak", "pizda", "debil", "idiot", "retard", "kreten", "kretén", "zasranej",
+    "zasraný", "mrdat", "mrdka", "prdel", "hajzl", "svině", "sviňa", "zkurvený",
+    "zkurveny", "jebat", "jebnutý", "jebnuty", "poser", "buzna", "buzerant",
+    "teplouš", "negr", "cikán", "cikan",
+    "fuck", "shit", "bitch", "asshole", "bastard", "cunt", "dick", "pussy",
+    "nigger", "nigga", "faggot", "retard", "whore", "slut", "motherfucker",
+    "cocksucker", "wanker", "twat", "prick", "dumbass", "jackass", "bullshit",
+    "damn", "hell", "ass", "crap",
+    "scheiße", "scheisse", "arschloch", "wichser", "hurensohn", "fotze", "schlampe",
+    "fick", "ficken", "kacke", "verdammt", "depp", "vollidiot",
+    "kurwa", "chuj", "skurwysyn", "jebać", "jebac", "pierdolić", "pierdolic",
+    "dupek", "głupek", "glupi", "cwel", "pojeb",
+    "блядь", "сука", "пизда", "хуй", "ебать", "мудак", "ублюдок", "залупа",
+    "blyad", "pizda", "huy", "ebat", "mudak",
+    "merde", "putain", "connard", "salope", "enculé", "encule", "batard", "foutre",
+    "mierda", "puta", "coño", "joder", "hostia", "cabron", "cabrón", "gilipollas",
+    "cazzo", "vaffanculo", "stronzo", "merda", "puttana",
+];
+
+function containsBadword(text) {
+    const lower = text.toLowerCase();
+    return BADWORDS.some(word => lower.includes(word));
+}
+
+const REP_FILE = "./rep.json";
+let repData = fs.existsSync(REP_FILE)
+    ? JSON.parse(fs.readFileSync(REP_FILE, "utf8"))
+    : {};
+
+function saveRep() {
+    fs.writeFileSync(REP_FILE, JSON.stringify(repData, null, 2));
+}
 
 const RR_FILE = "./reactionRoles.json";
 const PROMPT_FILE = "./prompt.txt";
@@ -75,7 +118,7 @@ Pravidla serveru: Vyhledej aktuální RP pravidla pro FiveM/GTA RP servery a apl
 Chování:
 - Vždy komunikuj formálně a profesionálně.
 - Pomáhej hráčům s dotazy ohledně serveru, pravidel a roleplay.
-- Pokud hráč poruší Discord ToS nebo základní pravidla slušnosti a morálky, uděl mu timeout.
+- Pokud hráč poruší Discord ToS nebo základní pravidla slušnosti a morálky, napiš [timeout] na konec odpovědi.
 - Timeout uděluj POUZE při jasném porušení, ne na základě žádosti hráče.
 - Nikdy nezneužívej své pravomoci.`;
 
@@ -163,6 +206,98 @@ client.once("ready", async () => {
     );
 });
 
+// ======================
+// TIMEOUT HELPER
+// ======================
+async function applyTimeout(member, channel, reason) {
+    if (!member || !member.moderatable) return;
+    await member.timeout(60 * 60 * 1000, reason).catch(() => {});
+    const embed = new EmbedBuilder()
+        .setColor("#ff0000")
+        .setTitle("🔇 Timeout udělen")
+        .setDescription(`${member} byl umlčen na **1 hodinu**.\n**Důvod:** ${reason}\n\nTimeout může zrušit pouze <@&${ADMIN_ROLE_ID}>.`)
+        .setFooter(FOOTER)
+        .setTimestamp();
+    await channel.send({ embeds: [embed] }).catch(() => {});
+}
+
+// ======================
+// VIOLATION CHECK (AI)
+// ======================
+async function checkViolation(message) {
+    try {
+        const response = await groq.chat.completions.create({
+            model: "llama-3.3-70b-versatile",
+            messages: [
+                {
+                    role: "system",
+                    content: `Jsi moderační AI. Analyzuj zprávu a urči zda porušuje Discord ToS nebo právní jurisdikci České republiky.
+
+Odpověz POUZE ve formátu JSON a nic jiného:
+{
+  "violation": true nebo false,
+  "type": "tos" nebo "law" nebo null,
+  "description": "Stručný popis co bylo porušeno",
+  "reference": "Odkaz na zdroj - pro ToS použij https://discord.com/terms, pro zákony ČR použij konkrétní URL z zakonyprolidi.cz např. https://www.zakonyprolidi.cz/cs/2009-40 pro trestní zákoník"
+}
+
+Příklady porušení ToS: výhrůžky, doxxing, NSFW mimo určené kanály, spam, phishing, šíření malware, sexualizace nezletilých.
+Příklady porušení zákonů ČR: výhrůžky (§ 353 TZ), pomluva (§ 184 TZ), podvod (§ 209 TZ), šíření nenávisti (§ 355 TZ), porušení soukromí (§ 180 TZ), kyberšikana (§ 353 TZ).
+
+Pokud zpráva neporušuje nic závažného, vrať violation: false.`
+                },
+                {
+                    role: "user",
+                    content: `Zpráva od uživatele: "${message.content}"\nKanál: ${message.channel.name}\nServer: ${message.guild.name}`
+                }
+            ],
+            max_tokens: 300,
+        });
+
+        const raw = response.choices[0]?.message?.content || "{}";
+        const clean = raw.replace(/```json|```/g, "").trim();
+        return JSON.parse(clean);
+
+    } catch (err) {
+        console.error("Violation check error:", err);
+        return { violation: false };
+    }
+}
+
+// ======================
+// SEND VIOLATION REPORT
+// ======================
+async function sendViolationReport(message, violationData) {
+    const reportChannel = await client.channels.fetch(REPORT_CHANNEL_ID).catch(() => null);
+    if (!reportChannel) return;
+
+    const typeLabel = violationData.type === "tos"
+        ? "⚠️ Porušení Discord ToS"
+        : "⚖️ Porušení právní jurisdikce ČR";
+
+    const embed = new EmbedBuilder()
+        .setColor("#ff0000")
+        .setTitle(`🚨 ${typeLabel}`)
+        .addFields(
+            { name: "👤 Uživatel", value: `${message.author} (${message.author.tag})`, inline: true },
+            { name: "📌 Kanál", value: `${message.channel}`, inline: true },
+            { name: "🕐 Čas", value: `<t:${Math.floor(message.createdTimestamp / 1000)}:F>`, inline: true },
+            { name: "💬 Zpráva", value: `\`\`\`${message.content.slice(0, 1000)}\`\`\`` },
+            { name: "📋 Popis porušení", value: violationData.description || "Neuvedeno" },
+            { name: "🔗 Zdroj / Reference", value: violationData.reference || "Neuvedeno" }
+        )
+        .setFooter(FOOTER)
+        .setTimestamp();
+
+    await reportChannel.send({
+        content: `<@&${ADMIN_ROLE_ID}> — Bylo detekováno závažné porušení!`,
+        embeds: [embed]
+    }).catch(() => {});
+}
+
+// ======================
+// INTERACTIONS
+// ======================
 client.on("interactionCreate", async interaction => {
 
     if (interaction.isChatInputCommand()) {
@@ -174,9 +309,8 @@ client.on("interactionCreate", async interaction => {
                     new EmbedBuilder()
                         .setTitle("📘 Help")
                         .setColor(EMBED_COLOR)
-                        .setDescription(
-                            "🎫 /ticket-panel\n🧾 /embed\n🛠️ /embed-editor\n🎭 /reaction-role-panel\n➕ /role add\n➖ /role remove\n📝 /prompt"
-                        )
+                        .setDescription("🎫 /ticket-panel\n🧾 /embed\n🛠️ /embed-editor\n🎭 /reaction-role-panel\n➕ /role add\n➖ /role remove\n📝 /prompt")
+                        .setFooter(FOOTER)
                 ]
             });
         }
@@ -195,7 +329,7 @@ client.on("interactionCreate", async interaction => {
                         .setCustomId("prompt_value")
                         .setLabel("Systémový prompt")
                         .setStyle(TextInputStyle.Paragraph)
-                        .setValue(systemPrompt)
+                        .setValue(systemPrompt.slice(0, 4000))
                         .setRequired(true)
                 )
             );
@@ -225,7 +359,7 @@ client.on("interactionCreate", async interaction => {
                         .setTitle("🎫 Ticket Systém")
                         .setColor(EMBED_COLOR)
                         .setDescription("🛩️ Ticket systém")
-                        .setFooter({ text: "(c) 2026 LexionRP.cz - all rights reserved." })
+                        .setFooter(FOOTER)
                 ],
                 components: [new ActionRowBuilder().addComponents(menu)]
             });
@@ -268,7 +402,8 @@ client.on("interactionCreate", async interaction => {
             const embed = new EmbedBuilder()
                 .setTitle("🎭 Reaction Role Panel")
                 .setColor(EMBED_COLOR)
-                .setDescription("Reaguj pro role");
+                .setDescription("Reaguj pro role")
+                .setFooter(FOOTER);
 
             const msg = await interaction.reply({ embeds: [embed], fetchReply: true });
 
@@ -462,7 +597,7 @@ client.on("interactionCreate", async interaction => {
             systemPrompt = interaction.fields.getTextInputValue("prompt_value");
             savePrompt();
             chatHistories.clear();
-            return interaction.reply({ content: "✅ Systémový prompt upraven a historie chatu vymazána!", ephemeral: true });
+            return interaction.reply({ content: "✅ Systémový prompt upraven!", ephemeral: true });
         }
 
         if (interaction.customId === "embed_create") {
@@ -471,7 +606,9 @@ client.on("interactionCreate", async interaction => {
             const color = interaction.fields.getTextInputValue("color");
             const image = interaction.fields.getTextInputValue("image");
 
-            const embed = new EmbedBuilder().setColor(color || EMBED_COLOR);
+            const embed = new EmbedBuilder()
+                .setColor(color || EMBED_COLOR)
+                .setFooter(FOOTER);
             if (title) embed.setTitle(title);
             if (desc) embed.setDescription(desc);
             if (image) embed.setImage(image);
@@ -494,12 +631,11 @@ client.on("interactionCreate", async interaction => {
 });
 
 // ======================
-// CHAT (Groq AI)
+// MESSAGE CREATE
 // ======================
 client.on("messageCreate", async message => {
     if (message.author.bot) return;
 
-    // RR session
     const session = rrSessions.get(message.author.id);
     if (session) {
         const [emoji, roleId] = message.content.split(" ");
@@ -510,7 +646,116 @@ client.on("messageCreate", async message => {
         return;
     }
 
-    // AI chat kanál
+    const categoryId = message.channel.parentId;
+    const isExcluded = EXCLUDED_CATEGORIES.includes(categoryId);
+
+    // ======================
+    // REP SYSTEM
+    // ======================
+    if (message.channel.id === REP_CHANNEL_ID) {
+        const content = message.content.trim();
+
+        if (containsBadword(content)) {
+            await message.delete().catch(() => {});
+            await message.channel.send({
+                embeds: [
+                    new EmbedBuilder()
+                        .setColor("#ff0000")
+                        .setTitle("⚠️ Upomínka")
+                        .setDescription(`${message.author}, ve zprávě byly detekovány nevhodné výrazy. Toto chování není tolerováno.`)
+                        .setFooter(FOOTER)
+                        .setTimestamp()
+                ]
+            });
+            const member = await message.guild.members.fetch(message.author.id).catch(() => null);
+            await applyTimeout(member, message.channel, "Nevhodné výrazy v rep kanálu");
+            return;
+        }
+
+        const repMatch = content.match(/^([+-]rep)\s+<@!?(\d+)>(.*)?$/i);
+
+        if (!repMatch) {
+            await message.delete().catch(() => {});
+            await message.channel.send({
+                content: `${message.author} ❌ Neplatný formát! Použij: \`+rep @uživatel\` nebo \`-rep @uživatel\``
+            }).then(m => setTimeout(() => m.delete().catch(() => {}), 5000));
+            return;
+        }
+
+        const type = repMatch[1].toLowerCase();
+        const targetId = repMatch[2];
+        const note = repMatch[3]?.trim() || "";
+
+        if (targetId === message.author.id) {
+            await message.delete().catch(() => {});
+            await message.channel.send({
+                content: `${message.author} ❌ Nemůžeš dávat rep sám sobě!`
+            }).then(m => setTimeout(() => m.delete().catch(() => {}), 5000));
+            return;
+        }
+
+        const targetMember = await message.guild.members.fetch(targetId).catch(() => null);
+        if (!targetMember) {
+            await message.delete().catch(() => {});
+            return;
+        }
+
+        if (!repData[targetId]) repData[targetId] = { pos: 0, neg: 0 };
+        if (type === "+rep") repData[targetId].pos++;
+        else repData[targetId].neg--;
+
+        saveRep();
+
+        const total = repData[targetId].pos + repData[targetId].neg;
+        const embed = new EmbedBuilder()
+            .setColor(type === "+rep" ? "#00ff00" : "#ff0000")
+            .setTitle(type === "+rep" ? "👍 Pozitivní Rep" : "👎 Negativní Rep")
+            .setDescription(`${message.author} dal **${type}** uživateli ${targetMember}${note ? `\n📝 ${note}` : ""}`)
+            .addFields(
+                { name: "👍 Pozitivní", value: `${repData[targetId].pos}`, inline: true },
+                { name: "👎 Negativní", value: `${Math.abs(repData[targetId].neg)}`, inline: true },
+                { name: "⭐ Celkem", value: `${total}`, inline: true }
+            )
+            .setFooter(FOOTER)
+            .setTimestamp();
+
+        await message.delete().catch(() => {});
+        await message.channel.send({ embeds: [embed] });
+        return;
+    }
+
+    // ======================
+    // BADWORD FILTER + VIOLATION CHECK
+    // ======================
+    if (!isExcluded && message.channel.id !== CHAT_CHANNEL_ID) {
+        if (containsBadword(message.content)) {
+            await message.delete().catch(() => {});
+            await message.channel.send({
+                embeds: [
+                    new EmbedBuilder()
+                        .setColor("#ff8800")
+                        .setTitle("⚠️ Upomínka")
+                        .setDescription(`${message.author}, použití nevhodných výrazů není na tomto serveru povoleno.\nPři opakování bude uděleno přísnější opatření.`)
+                        .setFooter(FOOTER)
+                        .setTimestamp()
+                ]
+            });
+            const member = await message.guild.members.fetch(message.author.id).catch(() => null);
+            await applyTimeout(member, message.channel, "Použití nevhodných výrazů");
+            return;
+        }
+
+        // AI violation check (ToS / zákon ČR) — běží na pozadí
+        checkViolation(message).then(async result => {
+            if (result?.violation) {
+                await sendViolationReport(message, result);
+            }
+        }).catch(() => {});
+    }
+
+    // ======================
+    // AI CHAT
+    // ======================
     if (message.channel.id !== CHAT_CHANNEL_ID) return;
 
     const userId = message.author.id;
@@ -518,8 +763,6 @@ client.on("messageCreate", async message => {
 
     const history = chatHistories.get(userId);
     history.push({ role: "user", content: message.content });
-
-    // Max 20 zpráv v historii
     if (history.length > 20) history.splice(0, history.length - 20);
 
     try {
@@ -535,10 +778,8 @@ client.on("messageCreate", async message => {
         });
 
         const reply = response.choices[0]?.message?.content || "Omlouvám se, nepodařilo se mi odpovědět.";
-
         history.push({ role: "assistant", content: reply });
 
-        // Zkontroluj jestli má udelit timeout
         const shouldTimeout = reply.toLowerCase().includes("[timeout]");
         const cleanReply = reply.replace(/\[timeout\]/gi, "").trim();
 
@@ -546,10 +787,7 @@ client.on("messageCreate", async message => {
 
         if (shouldTimeout) {
             const member = await message.guild.members.fetch(userId).catch(() => null);
-            if (member && member.moderatable) {
-                await member.timeout(5 * 60 * 1000, "Porušení pravidel serveru / Discord ToS").catch(() => {});
-                await message.channel.send(`🔇 ${member} byl umlčen na 5 minut.`);
-            }
+            await applyTimeout(member, message.channel, "Porušení pravidel serveru / Discord ToS");
         }
 
     } catch (err) {
@@ -609,7 +847,8 @@ client.on("guildMemberAdd", async member => {
             `🚀 Jsme WL-ON Server, to znamená, že nám jde především o kvalitu Roleplaye. My jsme Lexion, více než jen Roleplay.!`
         )
         .setColor(EMBED_COLOR)
-        .setImage(WELCOME_IMAGE_URL);
+        .setImage(WELCOME_IMAGE_URL)
+        .setFooter(FOOTER);
 
     channel.send({
         content: `🎉 Vítej na serveru! Jsi náš **${memberCount}.** člen!`,
