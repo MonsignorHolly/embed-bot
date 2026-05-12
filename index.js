@@ -68,9 +68,8 @@ const BADWORDS = [
     "zkurveny", "jebat", "jebnutý", "jebnuty", "poser", "buzna", "buzerant",
     "teplouš", "negr", "cikán", "cikan",
     "fuck", "shit", "bitch", "asshole", "bastard", "cunt", "dick", "pussy",
-    "nigger", "nigga", "faggot", "retard", "whore", "slut", "motherfucker",
+    "nigger", "nigga", "faggot", "whore", "slut", "motherfucker",
     "cocksucker", "wanker", "twat", "prick", "dumbass", "jackass", "bullshit",
-    "damn", "hell", "ass", "crap",
     "scheiße", "scheisse", "arschloch", "wichser", "hurensohn", "fotze", "schlampe",
     "fick", "ficken", "kacke", "verdammt", "depp", "vollidiot",
     "kurwa", "chuj", "skurwysyn", "jebać", "jebac", "pierdolić", "pierdolic",
@@ -109,17 +108,12 @@ let systemPrompt = fs.existsSync(PROMPT_FILE)
 
 Server info:
 LexionRP.cz je WL-ON server zaměřený na Roleplay Los Santos. Zaměřujeme se na kvalitu, originalitu a profesionalitu.
-- Originalita: Skripty, Eventy a celkově přístup k hráčům a komunitě, kde jinde nenajdete.
-- Záleží nám na komunitě, jelikož komunita je alfa a omega úspěšného serveru.
-- Vynaložíme veškeré úsilí do pohodlného RP zážitku.
-
-Pravidla serveru: Vyhledej aktuální RP pravidla pro FiveM/GTA RP servery a aplikuj je v kontextu LexionRP.
 
 Chování:
 - Vždy komunikuj formálně a profesionálně.
 - Pomáhej hráčům s dotazy ohledně serveru, pravidel a roleplay.
-- Pokud hráč poruší Discord ToS nebo základní pravidla slušnosti a morálky, napiš [timeout] na konec odpovědi.
-- Timeout uděluj POUZE při jasném porušení, ne na základě žádosti hráče.
+- NIKDY nepište [timeout] pokud hráč pouze chválí, chvástá se, diskutuje nebo píše běžnou konverzaci.
+- [timeout] piš POUZE při přímých výhrůžkách násilím, doxxingu, phishingu, šíření malware, nebo CSAM.
 - Nikdy nezneužívej své pravomoci.`;
 
 function savePrompt() {
@@ -231,32 +225,49 @@ async function checkViolation(message) {
             messages: [
                 {
                     role: "system",
-                    content: `Jsi moderační AI. Analyzuj zprávu a urči zda porušuje Discord ToS nebo právní jurisdikci České republiky.
+                    content: `Jsi moderační AI pro Discord server. Analyzuj zprávu a urči zda porušuje Discord ToS nebo trestní zákony České republiky.
 
-Odpověz POUZE ve formátu JSON a nic jiného:
+Odpověz POUZE ve formátu JSON bez jakéhokoliv dalšího textu:
 {
   "violation": true nebo false,
   "type": "tos" nebo "law" nebo null,
   "description": "Stručný popis co bylo porušeno",
-  "reference": "Odkaz na zdroj - pro ToS použij https://discord.com/terms, pro zákony ČR použij konkrétní URL z zakonyprolidi.cz např. https://www.zakonyprolidi.cz/cs/2009-40 pro trestní zákoník"
+  "reference": "URL zdroje"
 }
 
-Příklady porušení ToS: výhrůžky, doxxing, NSFW mimo určené kanály, spam, phishing, šíření malware, sexualizace nezletilých.
-Příklady porušení zákonů ČR: výhrůžky (§ 353 TZ), pomluva (§ 184 TZ), podvod (§ 209 TZ), šíření nenávisti (§ 355 TZ), porušení soukromí (§ 180 TZ), kyberšikana (§ 353 TZ).
+TRESTEJ POUZE tyto závažné případy:
+- Discord ToS: přímé výhrůžky násilím nebo smrtí, doxxing (zveřejnění osobních údajů), phishing, šíření malware, sexuální obsah nezletilých (CSAM), koordinované obtěžování
+- Zákony ČR: přímá výhrůžka násilím §353 TZ (https://www.zakonyprolidi.cz/cs/2009-40#p353), šíření nenávisti vůči skupině §355 TZ (https://www.zakonyprolidi.cz/cs/2009-40#p355), pomluva s konkrétními nepravdivými fakty §184 TZ, podvod §209 TZ
 
-Pokud zpráva neporušuje nic závažného, vrať violation: false.`
+NIKDY NETRESTEJ (vrať violation: false):
+- Chvástání, sebechvála ("jsem borec", "jsem nejlepší")
+- Běžné nadávky a spory mezi hráči (ty řeší jiný filtr)
+- Sarkasmus, humor, ironie
+- Kritika serveru nebo administrace
+- Běžnou konverzaci jakéhokoliv tématu
+- Provokace bez přímé výhrůžky
+- Vulgární výrazy bez výhrůžky
+
+Pokud si nejsi absolutně jistý že jde o závažné porušení, VŽDY vrať violation: false.`
                 },
                 {
                     role: "user",
-                    content: `Zpráva od uživatele: "${message.content}"\nKanál: ${message.channel.name}\nServer: ${message.guild.name}`
+                    content: `Zpráva: "${message.content}"\nKanál: ${message.channel.name}`
                 }
             ],
-            max_tokens: 300,
+            max_tokens: 200,
         });
 
         const raw = response.choices[0]?.message?.content || "{}";
         const clean = raw.replace(/```json|```/g, "").trim();
-        return JSON.parse(clean);
+        const parsed = JSON.parse(clean);
+
+        // Extra pojistka — pokud description neobsahuje konkrétní porušení, ignoruj
+        if (!parsed.violation || !parsed.description || parsed.description.length < 10) {
+            return { violation: false };
+        }
+
+        return parsed;
 
     } catch (err) {
         console.error("Violation check error:", err);
@@ -268,31 +279,39 @@ Pokud zpráva neporušuje nic závažného, vrať violation: false.`
 // SEND VIOLATION REPORT
 // ======================
 async function sendViolationReport(message, violationData) {
-    const reportChannel = await client.channels.fetch(REPORT_CHANNEL_ID).catch(() => null);
-    if (!reportChannel) return;
+    try {
+        const reportChannel = await client.channels.fetch(REPORT_CHANNEL_ID).catch(() => null);
+        if (!reportChannel) {
+            console.error("Report channel not found:", REPORT_CHANNEL_ID);
+            return;
+        }
 
-    const typeLabel = violationData.type === "tos"
-        ? "⚠️ Porušení Discord ToS"
-        : "⚖️ Porušení právní jurisdikce ČR";
+        const typeLabel = violationData.type === "tos"
+            ? "⚠️ Porušení Discord ToS"
+            : "⚖️ Porušení právní jurisdikce ČR";
 
-    const embed = new EmbedBuilder()
-        .setColor("#ff0000")
-        .setTitle(`🚨 ${typeLabel}`)
-        .addFields(
-            { name: "👤 Uživatel", value: `${message.author} (${message.author.tag})`, inline: true },
-            { name: "📌 Kanál", value: `${message.channel}`, inline: true },
-            { name: "🕐 Čas", value: `<t:${Math.floor(message.createdTimestamp / 1000)}:F>`, inline: true },
-            { name: "💬 Zpráva", value: `\`\`\`${message.content.slice(0, 1000)}\`\`\`` },
-            { name: "📋 Popis porušení", value: violationData.description || "Neuvedeno" },
-            { name: "🔗 Zdroj / Reference", value: violationData.reference || "Neuvedeno" }
-        )
-        .setFooter(FOOTER)
-        .setTimestamp();
+        const embed = new EmbedBuilder()
+            .setColor("#ff0000")
+            .setTitle(`🚨 ${typeLabel}`)
+            .addFields(
+                { name: "👤 Uživatel", value: `${message.author} (${message.author.tag})`, inline: true },
+                { name: "📌 Kanál", value: `${message.channel}`, inline: true },
+                { name: "🕐 Čas", value: `<t:${Math.floor(message.createdTimestamp / 1000)}:F>`, inline: true },
+                { name: "💬 Zpráva", value: `\`\`\`${message.content.slice(0, 1000)}\`\`\`` },
+                { name: "📋 Popis porušení", value: violationData.description },
+                { name: "🔗 Zdroj / Reference", value: violationData.reference || "Neuvedeno" }
+            )
+            .setFooter(FOOTER)
+            .setTimestamp();
 
-    await reportChannel.send({
-        content: `<@&${ADMIN_ROLE_ID}> — Bylo detekováno závažné porušení!`,
-        embeds: [embed]
-    }).catch(() => {});
+        await reportChannel.send({
+            content: `<@&${ADMIN_ROLE_ID}> — Bylo detekováno závažné porušení!`,
+            embeds: [embed]
+        });
+
+    } catch (err) {
+        console.error("sendViolationReport error:", err);
+    }
 }
 
 // ======================
@@ -745,12 +764,12 @@ client.on("messageCreate", async message => {
             return;
         }
 
-        // AI violation check (ToS / zákon ČR) — běží na pozadí
+        // Violation check na pozadí — pouze report, žádný automatický timeout
         checkViolation(message).then(async result => {
-            if (result?.violation) {
+            if (result?.violation === true && result?.type && result?.description) {
                 await sendViolationReport(message, result);
             }
-        }).catch(() => {});
+        }).catch(err => console.error("Violation check failed:", err));
     }
 
     // ======================
@@ -780,14 +799,20 @@ client.on("messageCreate", async message => {
         const reply = response.choices[0]?.message?.content || "Omlouvám se, nepodařilo se mi odpovědět.";
         history.push({ role: "assistant", content: reply });
 
+        // Timeout pouze pokud odpověď obsahuje [timeout] A zpráva obsahuje jasné porušení
         const shouldTimeout = reply.toLowerCase().includes("[timeout]");
         const cleanReply = reply.replace(/\[timeout\]/gi, "").trim();
 
         await message.reply(cleanReply);
 
         if (shouldTimeout) {
-            const member = await message.guild.members.fetch(userId).catch(() => null);
-            await applyTimeout(member, message.channel, "Porušení pravidel serveru / Discord ToS");
+            // Extra ověření — zavolej violation check před udělením timeoutu
+            const violation = await checkViolation(message);
+            if (violation?.violation === true) {
+                const member = await message.guild.members.fetch(userId).catch(() => null);
+                await applyTimeout(member, message.channel, "Porušení pravidel serveru / Discord ToS");
+                await sendViolationReport(message, violation);
+            }
         }
 
     } catch (err) {
