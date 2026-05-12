@@ -796,42 +796,118 @@ client.on("messageCreate", async message => {
     
     const history = chatHistories.get(userId);
     
-    // Uložení zprávy uživatele (sanitizované)
-    history.push({ role: "user", content: sanitize(message.content) });
-    if (history.length > 20) history.splice(0, history.length - 20);
+    // Uložení zprávy uživatele
+    history.push({
+        role: "user",
+        content: sanitize(message.content)
+    });
+    
+    if (history.length > 20) {
+        history.splice(0, history.length - 20);
+    }
     
     try {
-        let rawReply = response.choices?.[0]?.message?.content;
-        
+        await message.channel.sendTyping();
+    
+        // Bezpečné sestavení messages
+        const messages = [
+            {
+                role: "system",
+                content: sanitize(systemPrompt)
+            },
+            ...history
+                .map(h => ({
+                    role: h.role,
+                    content: sanitize(h.content)
+                }))
+                .filter(h => h.content.length > 0)
+        ];
+    
+        const response = await groq.chat.completions.create({
+            model: "llama-3.3-70b-versatile",
+            messages,
+            max_tokens: 1024,
+            temperature: 0.7
+        });
+    
+        // Debug do konzole
+        console.log("Groq response:", JSON.stringify(response, null, 2));
+    
+        let rawReply = response?.choices?.[0]?.message?.content;
+    
+        // Pokud model vrátí pole místo stringu
+        if (Array.isArray(rawReply)) {
+            rawReply = rawReply
+                .map(part => part?.text || part?.content || "")
+                .join(" ");
+        }
+    
+        // Fallback
         if (typeof rawReply !== "string" || !rawReply.trim()) {
             rawReply = "Omlouvám se, nepodařilo se mi odpovědět.";
         }
-        
-        const reply = sanitize(rawReply);
-        
-        history.push({ role: "assistant", content: reply });
-        
-        const shouldTimeout = reply.toLowerCase().includes("[timeout]");
-        const cleanReply = reply.replace(/\[timeout\]/gi, "").trim();
-        
-        if (!cleanReply) {
-            return await message.reply("Omlouvám se, nepodařilo se mi odpovědět.");
-        }
-        
-        await message.reply(cleanReply);
     
+        const reply = sanitize(rawReply);
+    
+        // Uložení odpovědi do historie
+        history.push({
+            role: "assistant",
+            content: reply
+        });
+    
+        // Timeout marker
+        const shouldTimeout = reply.toLowerCase().includes("[timeout]");
+    
+        // Odstranění markeru
+        const cleanReply = reply
+            .replace(/\[timeout\]/gi, "")
+            .trim();
+    
+        // Pokud je odpověď prázdná
+        if (!cleanReply) {
+            return await message.reply(
+                "Omlouvám se, nepodařilo se mi odpovědět."
+            );
+        }
+    
+        // Discord limit
+        const finalReply = cleanReply.slice(0, 1900);
+    
+        await message.reply(finalReply);
+    
+        // Volitelný timeout
         if (shouldTimeout) {
             const violation = await checkViolation(message);
+    
             if (violation?.violation === true) {
-                const member = await message.guild.members.fetch(userId).catch(() => null);
-                await applyTimeout(member, message.channel, "Porušení pravidel serveru / Discord ToS");
+                const member = await message.guild.members
+                    .fetch(userId)
+                    .catch(() => null);
+    
+                await applyTimeout(
+                    member,
+                    message.channel,
+                    "Porušení pravidel serveru / Discord ToS"
+                );
+    
                 await sendViolationReport(message, violation);
             }
         }
     
     } catch (err) {
-        console.error("Groq error:", err);
-        await message.reply("❌ Chyba při komunikaci s AI.").catch(() => {});
+        console.error("Groq error details:", err);
+    
+        let errorMessage = "❌ Chyba při komunikaci s AI.";
+    
+        if (err?.status === 401) {
+            errorMessage = "❌ Neplatný GROQ_API_KEY.";
+        } else if (err?.status === 429) {
+            errorMessage = "❌ Překročen limit API. Zkus to za chvíli.";
+        } else if (err?.status >= 500) {
+            errorMessage = "❌ Groq servery jsou momentálně nedostupné.";
+        }
+    
+        await message.reply(errorMessage).catch(() => {});
     }
 });
 
