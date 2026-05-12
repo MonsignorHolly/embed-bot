@@ -889,17 +889,31 @@ client.on("messageCreate", async message => {
     } catch (err) {
         console.error("Groq error details:", err);
     
+        // Výpis detailů do konzole
+        console.error("Status:", err?.status);
+        console.error("Message:", err?.message);
+        console.error("Response:", err?.error || err?.response || err);
+    
         let errorMessage = "❌ Chyba při komunikaci s AI.";
     
+        // HTTP statusy
         if (err?.status === 401) {
             errorMessage = "❌ Neplatný GROQ_API_KEY.";
         } else if (err?.status === 429) {
             errorMessage = "❌ Překročen limit API. Zkus to za chvíli.";
+        } else if (err?.status === 400) {
+            errorMessage = "❌ Neplatný požadavek na AI.";
+        } else if (err?.status === 413) {
+            errorMessage = "❌ Příliš dlouhá konverzace.";
         } else if (err?.status >= 500) {
             errorMessage = "❌ Groq servery jsou momentálně nedostupné.";
         }
     
-        await message.reply(errorMessage).catch(() => {});
+        if (err?.error?.message) {
+            errorMessage += `\n\`${err.error.message}\``;
+        }
+    
+        await message.reply(errorMessage.slice(0, 1900)).catch(() => {});
     }
 });
 
