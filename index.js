@@ -223,7 +223,7 @@ async function applyTimeout(member, channel, reason) {
 async function checkViolation(message) {
     try {
         const response = await groq.chat.completions.create({
-            model: "llama-3.3-70b-versatile",
+            model: "llama-3.1-8b-instant",
             messages: [
                 {
                     role: "system",
@@ -824,7 +824,7 @@ client.on("messageCreate", async message => {
         ];
     
         const response = await groq.chat.completions.create({
-            model: "llama-3.3-70b-versatile",
+            model: "lama-3.1-8b-instant",
             messages,
             max_tokens: 1024,
             temperature: 0.7
