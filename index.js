@@ -877,21 +877,13 @@ client.on("messageCreate", async message => {
     
         // Volitelný timeout
         if (shouldTimeout) {
-            const violation = await checkViolation(message);
-    
-            if (violation?.violation === true) {
-                const member = await message.guild.members
-                    .fetch(userId)
-                    .catch(() => null);
-    
-                await applyTimeout(
-                    member,
-                    message.channel,
-                    "Porušení pravidel serveru / Discord ToS"
-                );
-    
-                await sendViolationReport(message, violation);
-            }
+            const member = await message.guild.members.fetch(userId).catch(() => null);
+        
+            await applyTimeout(
+                member,
+                message.channel,
+                "Porušení pravidel serveru / Discord ToS"
+            );
         }
     
     } catch (err) {
