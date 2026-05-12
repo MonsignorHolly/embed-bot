@@ -649,12 +649,16 @@ client.on("interactionCreate", async interaction => {
     }
 });
 function sanitize(text) {
-    if (!text) return "";
+    if (typeof text !== "string") return "";
+
     return text
-        .replace(/[\u0000-\u001F\u007F-\u009F]/g, "") // control chars
-        .replace(/\p{Cs}/gu, "") // nevalidní unicode
-        .replace(/\s+/g, " ") // normalize whitespace
-        .trim();
+        .normalize("NFKC")
+        .replace(/[\u0000-\u001F\u007F-\u009F]/g, "")
+        .replace(/\p{Cs}/gu, "")
+        .replace(/\uFFFD/g, "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 1900);
 }
 
 // ======================
@@ -795,27 +799,23 @@ client.on("messageCreate", async message => {
     if (history.length > 20) history.splice(0, history.length - 20);
     
     try {
-        await message.channel.sendTyping();
-    
-        const response = await groq.chat.completions.create({
-            model: "llama-3.3-70b-versatile",
-            messages: [
-                { role: "system", content: sanitize(systemPrompt) },
-                ...history.map(h => ({
-                    role: h.role,
-                    content: sanitize(h.content)
-                }))
-            ],
-            max_tokens: 1024,
-        });
-    
-        const reply = sanitize(response.choices[0]?.message?.content || "Omlouvám se, nepodařilo se mi odpovědět.");
-    
+        let rawReply = response.choices?.[0]?.message?.content;
+        
+        if (typeof rawReply !== "string" || !rawReply.trim()) {
+            rawReply = "Omlouvám se, nepodařilo se mi odpovědět.";
+        }
+        
+        const reply = sanitize(rawReply);
+        
         history.push({ role: "assistant", content: reply });
-    
+        
         const shouldTimeout = reply.toLowerCase().includes("[timeout]");
         const cleanReply = reply.replace(/\[timeout\]/gi, "").trim();
-    
+        
+        if (!cleanReply) {
+            return await message.reply("Omlouvám se, nepodařilo se mi odpovědět.");
+        }
+        
         await message.reply(cleanReply);
     
         if (shouldTimeout) {
