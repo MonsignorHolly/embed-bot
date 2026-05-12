@@ -780,57 +780,57 @@ function sanitize(text) {
         .trim();
 }
 
-// ======================
-// AI CHAT
-// ======================
-if (message.channel.id !== CHAT_CHANNEL_ID) return;
-
-const userId = message.author.id;
-if (!chatHistories.has(userId)) chatHistories.set(userId, []);
-
-const history = chatHistories.get(userId);
-history.push({ role: "user", content: sanitize(message.content) });
-if (history.length > 20) history.splice(0, history.length - 20);
-
-try {
-    await message.channel.sendTyping();
-
-    const response = await groq.chat.completions.create({
-        model: "llama-3.3-70b-versatile",
-        messages: [
-            { role: "system", content: sanitize(systemPrompt) },
-            ...history.map(h => ({
-                role: h.role,
-                content: sanitize(h.content)
-            }))
-        ],
-        max_tokens: 1024,
-    });
-
-    const reply = response.choices[0]?.message?.content || "Omlouvám se, nepodařilo se mi odpovědět.";
-    const cleanReply = sanitize(reply);
-
-    history.push({ role: "assistant", content: cleanReply });
-
-    const shouldTimeout = cleanReply.toLowerCase().includes("[timeout]");
-    const finalReply = cleanReply.replace(/\[timeout\]/gi, "").trim();
-
-    await message.reply(finalReply);
-
-    if (shouldTimeout) {
-        const violation = await checkViolation(message);
-        if (violation?.violation === true) {
-            const member = await message.guild.members.fetch(userId).catch(() => null);
-            await applyTimeout(member, message.channel, "Porušení pravidel serveru / Discord ToS");
-            await sendViolationReport(message, violation);
+    // ======================
+    // AI CHAT
+    // ======================
+    if (message.channel.id !== CHAT_CHANNEL_ID) return;
+    
+    const userId = message.author.id;
+    if (!chatHistories.has(userId)) chatHistories.set(userId, []);
+    
+    const history = chatHistories.get(userId);
+    history.push({ role: "user", content: sanitize(message.content) });
+    if (history.length > 20) history.splice(0, history.length - 20);
+    
+    try {
+        await message.channel.sendTyping();
+    
+        const response = await groq.chat.completions.create({
+            model: "llama-3.3-70b-versatile",
+            messages: [
+                { role: "system", content: sanitize(systemPrompt) },
+                ...history.map(h => ({
+                    role: h.role,
+                    content: sanitize(h.content)
+                }))
+            ],
+            max_tokens: 1024,
+        });
+    
+        const reply = response.choices[0]?.message?.content || "Omlouvám se, nepodařilo se mi odpovědět.";
+        const cleanReply = sanitize(reply);
+    
+        history.push({ role: "assistant", content: cleanReply });
+    
+        const shouldTimeout = cleanReply.toLowerCase().includes("[timeout]");
+        const finalReply = cleanReply.replace(/\[timeout\]/gi, "").trim();
+    
+        await message.reply(finalReply);
+    
+        if (shouldTimeout) {
+            const violation = await checkViolation(message);
+            if (violation?.violation === true) {
+                const member = await message.guild.members.fetch(userId).catch(() => null);
+                await applyTimeout(member, message.channel, "Porušení pravidel serveru / Discord ToS");
+                await sendViolationReport(message, violation);
+            }
         }
+
+    } catch (err) {
+        console.error("Groq error:", err);
+        await message.reply("❌ Chyba při komunikaci s AI.").catch(() => {});
     }
-
-} catch (err) {
-    console.error("Groq error:", err);
-    await message.reply("❌ Chyba při komunikaci s AI.").catch(() => {});
-}
-
+});
 
 // ======================
 // REACTIONS
