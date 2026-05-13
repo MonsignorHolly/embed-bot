@@ -1587,23 +1587,25 @@ client.on("messageCreate", async message => {
     if (containsBadword(message.content)) return;
   }
   if (containsBotDataRequest(message.content)) {
+    console.log("Detekován pokus o technická data");
     try {
       const reportChannel = await client.channels.fetch(REPORT_CHANNEL_ID).catch(() => null);
       if (reportChannel) {
+        console.log("Odesílám hlášení do kanálu", reportChannel.id);
         const techRepEmbed = new EmbedBuilder()
-            .setColor("#ff0000")
-            .setTitle("⚠️ Podezření na porušení ToS")
-            .setDescription(`Zpráva od ${message.author} byla smazána kvůli zprávě, která žádá o technické specifikace bota.`)
-            .addFields({ name: "Obsah zprávy", value: message.content })
-            .setFooter(FOOTER)
-            .setTimestamp();
-            
-        if (reportChannel) {
-            await reportChannel.send({embeds: [techRepEmbed] });
-        }
+          .setColor("#ff0000")
+          .setTitle("⚠️ Podezření na porušení ToS")
+          .setDescription(`Zpráva od ${message.author} byla smazána kvůli pokusu o získání technických specifikací bota.`)
+          .addFields({ name: "Obsah zprávy", value: message.content })
+          .setFooter(FOOTER)
+          .setTimestamp();
+
+        await reportChannel.send({ embeds: [techRepEmbed] });
+      } else {
+        console.log("Report kanál nenalezen nebo nemám práva");
       }
     } catch (err) {
-      console.error("Chyba při hlášení pokusu o technické data:", err);
+        console.error("Chyba při hlášení pokusu o technické data:", err);
     }
   }
 
