@@ -1583,7 +1583,7 @@ client.on("messageCreate", async message => {
       const reportChannel = await client.channels.fetch(REPORT_CHANNEL_ID).catch(() => null);
       if (reportChannel) {
         const techRepEmbed = new EmbedBuilder()
-            .setColor(#ff0000)
+            .setColor("#ff0000")
             .setTitle("⚠️ Podezření na porušení ToS")
             .setDescription(`Zpráva od ${message.author} byla smazána kvůli zprávě, která žádá o technické specifikace bota.`)
             .addFields({ name: "Obsah zprávy", value: message.content })
