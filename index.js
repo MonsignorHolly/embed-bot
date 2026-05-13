@@ -824,7 +824,7 @@ client.on("messageCreate", async message => {
         ];
     
         const response = await groq.chat.completions.create({
-            model: "lama-3.1-8b-instant",
+            model: "llama-3.1-8b-instant",
             messages,
             max_tokens: 1024,
             temperature: 0.7
