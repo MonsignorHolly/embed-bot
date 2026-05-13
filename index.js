@@ -776,7 +776,7 @@ Odpověz POUZE ve formátu JSON bez jakéhokoliv dalšího textu: {
 
 TRESTEJ POUZE tyto závažné případy:
 
-- Discord ToS: přímé výhrůžky násilím nebo smrtí, doxxing, phishing, šíření malware, CSAM, koordinované obtěžování, kombinace slov "dítě" a "sex" nebo "zvíře" a "sex"
+- Discord ToS: přímé výhrůžky násilím nebo smrtí, doxxing, phishing, šíření malware, CSAM, koordinované obtěžování, kombinace slov dítě a sex nebo zvíře a sex
 - Zákony ČR: přímá výhrůžka násilím § 353 TZ (https://www.zakonyprolidi.cz/cs/2009-40#p353), šíření nenávisti vůči skupině §355 TZ (https://www.zakonyprolidi.cz/cs/2009-40#p355), pomluva s konkrétními nepravdivými fakty §184 TZ, podvod §209 TZ.
 
 NIKDY NETRESTEJ (vrať violation: false):
