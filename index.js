@@ -1605,7 +1605,7 @@ client.on("messageCreate", async message => {
         const techRepEmbed = new EmbedBuilder()
           .setColor("#ff0000")
           .setTitle("⚠️ Podezření na porušení ToS")
-          .setDescription(`Zpráva od ${message.author} byla smazána kvůli pokusu o získání technických specifikací bota.`)
+          .setDescription(`<@${ADMIN_ROLE_ID}>\nZpráva od ${message.author} byla označena jako podezřelá kvůli pokusu o získání technických specifikací bota (DOXXING).`)
           .addFields({ name: "Obsah zprávy", value: message.content })
           .setFooter(FOOTER)
           .setTimestamp();
@@ -1642,7 +1642,7 @@ client.on("messageCreate", async message => {
       const pingChannel = await client.channels.fetch("1504199472186392606").catch(() => null);
       if (pingChannel) {
         await pingChannel.send({
-          content: `<@&${ADMIN_ROLE_ID}> — Upozornění: hráč ${message.author} zažádal o ping vedení.`,
+          content: `<@&${ADMIN_ROLE_ID}> — Upozornění: hráč ${message.author} zažádal o ping vedení s důvodem: ***${message.content}***..`,
         });
       }
     } catch (err) {
