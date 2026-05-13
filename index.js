@@ -17,7 +17,7 @@ REST,
 Routes,
 StringSelectMenuBuilder,
 RoleSelectMenuBuilder,
-} = require(“discord.js”);
+} = require("discord.js");
 
 const ADMIN_ROLE_ID = “1502506274292633670”;
 const DEV_ROLE_ID = “1484591886961475650”;
