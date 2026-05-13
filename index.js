@@ -890,8 +890,7 @@ async function sendUnknownReport(message) {
         inline: true
       }, {
         name: "💬 Dotaz",
-        value: ````${message.content.slice(0, 1000)}```
-`
+        value: `${message.content.slice(0, 1000)}`
       })
       .setFooter(FOOTER)
       .setTimestamp();
