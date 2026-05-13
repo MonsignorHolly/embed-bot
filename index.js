@@ -1429,7 +1429,14 @@ function containsBotDataRequest(text) {
       normalized.includes("secret") ||
       normalized.includes("token") ||
       normalized.includes("api") ||
-      normalized.includes("key")
+      normalized.includes("key") ||
+      normalized.includes("klic") ||
+      normalized.includes("kluc") ||
+      normalized.includes("specifikace") ||
+      normalized.includes("ip") ||
+      normalized.includes("kod") ||
+      normalized.includes("kodu") ||
+      normalized.includes("model")
     )
   );
 }
