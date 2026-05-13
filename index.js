@@ -1638,17 +1638,6 @@ client.on("messageCreate", async message => {
       console.error("Chyba při mazání zprávy nebo hlášení:", err);
     }
 
-    try {
-      const pingChannel = await client.channels.fetch("1504199472186392606").catch(() => null);
-      if (pingChannel) {
-        await pingChannel.send({
-          content: `<@&${ADMIN_ROLE_ID}> — Upozornění: hráč ${message.author} zažádal o ping vedení s důvodem: ***${message.content}***..`,
-        });
-      }
-    } catch (err) {
-      console.error("Chyba při hlášení žádosti o ping:", err);
-    }
-
     return;
   }
     
