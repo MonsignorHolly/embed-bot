@@ -1,6 +1,6 @@
-const fs = require(“fs”);
-require(“dotenv”).config();
-const Groq = require(“groq-sdk”);
+const fs = require("fs");
+require("dotenv").config();
+const Groq = require("groq-sdk");
 
 const {
 Client,
