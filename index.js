@@ -1421,25 +1421,35 @@ function containsChildOrAnimalAndSex(text) {
 }
 
 function containsBotDataRequest(text) {
+
+  const normalizeText = (txt) => {
+    return txt
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") 
+      .replace(/[^\w\s]/g, ""); 
+  };
+
   const normalized = normalizeText(text);
-  return (
-    normalized.includes("discord") && (
-      normalized.includes("token") ||
-      normalized.includes("client") ||
-      normalized.includes("bot") ||
-      normalized.includes("secret") ||
-      normalized.includes("token") ||
-      normalized.includes("api") ||
-      normalized.includes("key") ||
-      normalized.includes("klic") ||
-      normalized.includes("kluc") ||
-      normalized.includes("specifikace") ||
-      normalized.includes("ip") ||
-      normalized.includes("kod") ||
-      normalized.includes("kodu") ||
-      normalized.includes("model")
-    )
-  );
+
+  const keywords = [
+    "token",
+    "client",
+    "bot",
+    "secret",
+    "api",
+    "key",
+    "klic",
+    "kluc",
+    "specifikace",
+    "ip",
+    "kod",
+    "kodu",
+    "model"
+  ];
+
+
+  return keywords.some(keyword => normalized.includes(keyword));
 }
 // ======================
 // MESSAGE CREATE
