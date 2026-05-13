@@ -861,6 +861,8 @@ async function sendViolationReport(message, violationData) {
     await reportChannel.send({
       content: `<@&${ADMIN_ROLE_ID}> — Bylo detekováno závažné porušení!`,
       embeds: [embed]
+      message.delete(message.content);
+
     });
 
   } catch (err) {
