@@ -1582,15 +1582,17 @@ client.on("messageCreate", async message => {
     try {
       const reportChannel = await client.channels.fetch(REPORT_CHANNEL_ID).catch(() => null);
       if (reportChannel) {
-        await reportChannel.send({
-          const alertEmbed = new EmbedBuilder()
-        .setColor("#ff0000")
-        .setTitle("⚠️ Podezření na porušení ToS")
-        .setDescription(`Zpráva od ${message.author} byla smazána kvůli zprávě, která žádá o technické specifikace bota.`)
-        .addFields({ name: "Obsah zprávy", value: message.content })
-        .setTimestamp();
-,
-        });
+        const techRepEmbed = new EmbedBuilder()
+            .setColor(#ff0000)
+            .setTitle("⚠️ Podezření na porušení ToS")
+            .setDescription(`Zpráva od ${message.author} byla smazána kvůli zprávě, která žádá o technické specifikace bota.`)
+            .addFields({ name: "Obsah zprávy", value: message.content })
+            .setFooter(FOOTER)
+            .setTimestamp();
+            
+        if (reportChannel) {
+            await reportChannel.send({embeds: techRepEmbed});
+        }
       }
     } catch (err) {
       console.error("Chyba při hlášení pokusu o technické data:", err);
