@@ -1615,7 +1615,7 @@ client.on("messageCreate", async message => {
           .setTimestamp();
 
         await reportChannel.send({ 
-            content: `⚙️⛔️ <@&A${DMIN_ROLE_ID}> ⛔️⚙️`,
+            content: `⚙️⛔️ <@&${ADMIN_ROLE_ID}> ⛔️⚙️`,
             embeds: [techRepEmbed] 
             
         });
