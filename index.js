@@ -1458,7 +1458,6 @@ function containsBotDataRequest(text) {
   const keywords = [
     "token",
     "client",
-    "bot",
     "secret",
     "api",
     "key",
