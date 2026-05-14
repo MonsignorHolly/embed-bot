@@ -917,7 +917,7 @@ async function sendUnknownReport(message) {
 // ======================
 async function sendPingMessage(message) {
     try {
-        const pingChannel = await client.channel.fetch(PING_CHANNEL_ID).catch(() => null);
+        const pingChannel = await client.channels.fetch(PING_CHANNEL_ID).catch(() => null);
         if (!pingChannel) return;
         const pingEmbed = new EmbedBuilder()
             .setTitle("📍 Hráč si vyžádal PING")
