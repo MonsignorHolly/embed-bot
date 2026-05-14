@@ -1445,7 +1445,9 @@ function containsBotDataRequest(text) {
     "ip",
     "kod",
     "kodu",
-    "model"
+    "model",
+    "code",
+    "udaje"
   ];
 
 
@@ -1510,6 +1512,7 @@ client.on("messageCreate", async message => {
       await message.channel.send({
         content: `${message.author} ❌ Neplatný formát! Použij: '+rep @uživatel' nebo '-rep @uživatel'`
       }).then(m => setTimeout(() => m.delete().catch(() => {}), 5000));
+      ephemeral: true
       return;
     }
 
@@ -1522,6 +1525,7 @@ client.on("messageCreate", async message => {
       await message.channel.send({
         content: `${message.author} ❌ Nemůžeš dávat rep sám sobě!`
       }).then(m => setTimeout(() => m.delete().catch(() => {}), 5000));
+      ephemeral: true
       return;
     }
 
@@ -1611,7 +1615,7 @@ client.on("messageCreate", async message => {
           .setTimestamp();
 
         await reportChannel.send({ 
-            content: `⚙️⛔️ <@1502506274292633670> ⛔️⚙️`,
+            content: `⚙️⛔️ <@&A${DMIN_ROLE_ID}> ⛔️⚙️`,
             embeds: [techRepEmbed] 
             
         });
@@ -1636,7 +1640,9 @@ client.on("messageCreate", async message => {
 
       const adminChannel = await client.channels.fetch(REPORT_CHANNEL_ID).catch(() => null);
       if (adminChannel) {
-        await adminChannel.send({ embeds: [alertEmbed] });
+        await adminChannel.send({ 
+            embeds: [alertEmbed] 
+        });
       }
     } catch (err) {
       console.error("Chyba při mazání zprávy nebo hlášení:", err);
