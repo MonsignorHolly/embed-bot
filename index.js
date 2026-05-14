@@ -922,7 +922,7 @@ async function sendPingMessage(message) {
         const pingEmbed = new EmbedBuilder()
             .setTitle("📍 Hráč si vyžádal PING")
             .setColor(EMBED_COLOR)
-            .setDescription(`Hráč požádal o PING, input pro PING:\n${message.content}\nŽádám, aby jste se ho v chatu dotázali o co jde.`)
+            .setDescription(`Hráč ${message.author} požádal o PING, input pro PING:\n***${message.content}***\nŽádám, aby jste se ho v chatu dotázali o co jde.`)
             .setFooter(FOOTER)
             .setTimestamp();
             
