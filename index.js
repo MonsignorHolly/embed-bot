@@ -703,7 +703,7 @@ const rest = new REST({
     version: "10"
 }).setToken(TOKEN);
 
-client.once("ready", async () => {
+client.on("clientReady", async () => {
     console.log(`✅ Logged as ${client.user.tag}`);
     await rest.put(
         Routes.applicationCommands(client.user.id), {
