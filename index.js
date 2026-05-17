@@ -1111,47 +1111,55 @@ client.on("interactionCreate", async interaction => {
             });
         }
 
+        const {
+            ChannelType
+        } = require('discord.js');
+
         if (interaction.isStringSelectMenu() && interaction.customId === "ticket_select") {
-            await interaction.deferReply({
-                ephemeral: true
-            });
-            const categoryKey = interaction.values[0];
-            const categoryId = TICKET_CATEGORIES[categoryKey];
-            const username = interaction.user.username;
+            try {
+                // Odloží odpověď, aby se nezobrazila chyba "tato interakce se nezdařila"
+                await interaction.deferReply({
+                    ephemeral: true
+                });
+                const categoryKey = interaction.values[0];
+                const categoryId = TICKET_CATEGORIES[categoryKey];
+                const username = interaction.user.username;
 
-            if (!ticketCounters[categoryId]) {
-                ticketCounters[categoryId] = 0;
-            }
+                if (!ticketCounters[categoryId]) {
+                    ticketCounters[categoryId] = 0;
+                }
 
-            ticketCounters[categoryId]++;
-            saveCounters();
+                ticketCounters[categoryId]++;
+                saveCounters();
 
-            const ticketNumber = ticketCounters[categoryId];
-            const channelName = `Ticket-${categoryKey}-${username}-${ticketNumber}`;
+                const ticketNumber = ticketCounters[categoryId];
+                const channelName = `Ticket-${categoryKey}-${username}-${ticketNumber}`;
 
-            interaction.guild.channels.create({
-                name: channelName,
-                type: 0,
-                parent: categoryId,
-                permissionOverwrites: [{
-                    id: interaction.guild.id,
-                    deny: ['VIEW_CHANNEL']
-                },
-                    {
-                        id: interaction.user.id,
-                        allow: ['VIEW_CHANNEL', 'SEND_MESSAGES']
-                    }]
-            }).then(async (channel) => {
+                // Vytvoření kanálu s novým typem
+                const channel = await interaction.guild.channels.create({
+                    name: channelName,
+                    type: ChannelType.GuildText,
+                    parent: categoryId,
+                    permissionOverwrites: [{
+                        id: interaction.guild.id,
+                        deny: ['ViewChannel']
+                    },
+                        {
+                            id: interaction.user.id,
+                            allow: ['ViewChannel', 'SendMessages']
+                        }]
+                });
+
                 await channel.send(`Váš ticket byl vytvořen, ${interaction.user}.`);
                 await interaction.editReply({
                     content: `Ticket byl vytvořen: ${channelName}`
                 });
-            }).catch(async (err) => {
-                console.error(err);
+            } catch (err) {
+                console.error('Error creating ticket:', err);
                 await interaction.editReply({
                     content: 'Nepodařilo se vytvořit ticket.'
                 });
-            });
+            }
         }
         if (interaction.commandName === "embed") {
             if (!hasAccess(interaction.member))
