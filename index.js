@@ -1111,55 +1111,7 @@ client.on("interactionCreate", async interaction => {
             });
         }
 
-        const {
-            ChannelType
-        } = require('discord.js');
 
-        if (interaction.isStringSelectMenu() && interaction.customId === "ticket_select") {
-            try {
-                // Odloží odpověď, aby se nezobrazila chyba "tato interakce se nezdařila"
-                await interaction.deferReply({ ephemeral: true, withMessage: true });
-                
-                const categoryKey = interaction.values[0];
-                const categoryId = TICKET_CATEGORIES[categoryKey];
-                const username = interaction.user.username;
-
-                if (!ticketCounters[categoryId]) {
-                    ticketCounters[categoryId] = 0;
-                }
-
-                ticketCounters[categoryId]++;
-                saveCounters();
-
-                const ticketNumber = ticketCounters[categoryId];
-                const channelName = `Ticket-${categoryKey}-${username}-${ticketNumber}`;
-
-                // Vytvoření kanálu s novým typem
-                const channel = await interaction.guild.channels.create({
-                    name: channelName,
-                    type: ChannelType.GuildText,
-                    parent: categoryId,
-                    permissionOverwrites: [{
-                        id: interaction.guild.id,
-                        deny: ['ViewChannel']
-                    },
-                        {
-                            id: interaction.user.id,
-                            allow: ['ViewChannel', 'SendMessages']
-                        }]
-                });
-
-                await channel.send(`Váš ticket byl vytvořen, ${interaction.user}.`);
-                await interaction.editReply({
-                    content: `Ticket byl vytvořen: ${channelName}`
-                });
-            } catch (err) {
-                console.error('Error creating ticket:', err);
-                await interaction.editReply({
-                    content: 'Nepodařilo se vytvořit ticket.'
-                });
-            }
-        }
         if (interaction.commandName === "embed") {
             if (!hasAccess(interaction.member))
                 return interaction.reply({
@@ -1339,6 +1291,72 @@ client.on("interactionCreate", async interaction => {
                 return interaction.reply({
                     ephemeral: true,
                     content: `✅ Emoji **${emoji}** bylo odebráno z panelu`
+                });
+            }
+        }
+    }
+    if (interaction.isStringSelectMenu() && interaction.customId === "ticket_select") {
+        try {
+            await interaction.deferReply({
+                ephemeral: true
+            });
+
+            const {
+                ChannelType
+            } = require("discord.js");
+            const categoryKey = interaction.values[0];
+            const categoryId = TICKET_CATEGORIES[categoryKey];
+            const username = interaction.user.username;
+
+            if (!ticketCounters[categoryKey]) ticketCounters[categoryKey] = 0;
+            ticketCounters[categoryKey]++;
+            saveCounters();
+
+            const ticketNumber = ticketCounters[categoryKey];
+            const channelName = `ticket-${categoryKey}-${username}-${ticketNumber}`;
+
+            const channel = await interaction.guild.channels.create({
+                name: channelName,
+                type: ChannelType.GuildText,
+                parent: categoryId,
+                permissionOverwrites: [{
+                    id: interaction.guild.id,
+                    deny: ["ViewChannel"]
+                },
+                    {
+                        id: interaction.user.id,
+                        allow: ["ViewChannel", "SendMessages", "ReadMessageHistory"]
+                    },
+                    {
+                        id: SUPPORT_ROLE_ID,
+                        allow: ["ViewChannel", "SendMessages", "ReadMessageHistory"]
+                    }]
+            });
+
+            const embed = new EmbedBuilder()
+            .setColor(EMBED_COLOR)
+            .setTitle("🎫 Ticket otevřen")
+            .setDescription(`Vítej ${interaction.user}! Tvůj ticket byl vytvořen.\nTým podpory tě brzy kontaktuje.`)
+            .setFooter(FOOTER)
+            .setTimestamp();
+
+            await channel.send({
+                embeds: [embed]
+            });
+
+            return interaction.editReply({
+                content: `✅ Ticket byl vytvořen: ${channel}`
+            });
+
+        } catch (err) {
+            console.error("Error creating ticket:", err);
+            if (!interaction.replied && !interaction.deferred) {
+                await interaction.reply({
+                    content: "❌ Nepodařilo se vytvořit ticket.", ephemeral: true
+                });
+            } else {
+                await interaction.editReply({
+                    content: "❌ Nepodařilo se vytvořit ticket."
                 });
             }
         }
