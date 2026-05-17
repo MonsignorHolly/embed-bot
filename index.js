@@ -59,7 +59,8 @@ const AUTOROLE_IDS = [
     "1503108855842865305",
     "1502249732905635860"
 ];
-const countersFilePath = path.join(__dirname, 'ticketCounters.json');
+const path = require('path');
+const countersFilePath = path.join(__dirname || '.', 'ticketCounters.json');
 
 
 let ticketCounters = {};
