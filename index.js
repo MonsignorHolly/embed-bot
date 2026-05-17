@@ -1107,7 +1107,7 @@ client.on("interactionCreate", async interaction => {
                     .setFooter(FOOTER)
                 ],
                 components: [new ActionRowBuilder().addComponents(menu)],
-                fetchReply: true
+                withMessage: true
             });
         }
 
@@ -1118,7 +1118,7 @@ client.on("interactionCreate", async interaction => {
         if (interaction.isStringSelectMenu() && interaction.customId === "ticket_select") {
             try {
                 // Odloží odpověď, aby se nezobrazila chyba "tato interakce se nezdařila"
-                await interaction.deferReply({ ephemeral: true, fetchReply: true });
+                await interaction.deferReply({ ephemeral: true, withMessage: true });
                 
                 const categoryKey = interaction.values[0];
                 const categoryId = TICKET_CATEGORIES[categoryKey];
@@ -1220,7 +1220,7 @@ client.on("interactionCreate", async interaction => {
 
             const msg = await interaction.reply({
                 embeds: [embed],
-                fetchReply: true
+                withMessage: true
             });
 
             reactionRoles[msg.id] = {
