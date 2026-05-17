@@ -1118,9 +1118,8 @@ client.on("interactionCreate", async interaction => {
         if (interaction.isStringSelectMenu() && interaction.customId === "ticket_select") {
             try {
                 // Odloží odpověď, aby se nezobrazila chyba "tato interakce se nezdařila"
-                await interaction.deferReply({
-                    ephemeral: true
-                });
+                await interaction.deferReply({ ephemeral: true, fetchReply: true });
+                
                 const categoryKey = interaction.values[0];
                 const categoryId = TICKET_CATEGORIES[categoryKey];
                 const username = interaction.user.username;
