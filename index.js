@@ -1112,6 +1112,9 @@ client.on("interactionCreate", async interaction => {
         }
 
         if (interaction.isStringSelectMenu() && interaction.customId === "ticket_select") {
+            await interaction.deferReply({
+                ephemeral: true
+            });
             const categoryKey = interaction.values[0];
             const categoryId = TICKET_CATEGORIES[categoryKey];
             const username = interaction.user.username;
@@ -1140,10 +1143,15 @@ client.on("interactionCreate", async interaction => {
                     }]
             }).then(async (channel) => {
                 await channel.send(`Váš ticket byl vytvořen, ${interaction.user}.`);
-                await interaction.reply({
-                    content: `Ticket byl vytvořen: ${channelName}`, ephemeral: true
+                await interaction.editReply({
+                    content: `Ticket byl vytvořen: ${channelName}`
                 });
-            }).catch(console.error);
+            }).catch(async (err) => {
+                console.error(err);
+                await interaction.editReply({
+                    content: 'Nepodařilo se vytvořit ticket.'
+                });
+            });
         }
         if (interaction.commandName === "embed") {
             if (!hasAccess(interaction.member))
